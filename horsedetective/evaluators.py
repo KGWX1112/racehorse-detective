@@ -15,8 +15,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .models import WIN_CODES, Horse
-from .text import normalize_country, text_matches
+from .models import WIN_CODES, Horse, Race
+from .text import normalize_country, normalize_grade, text_matches
 
 
 class Status(str, Enum):
@@ -167,6 +167,19 @@ def known_raced_countries(h: Horse) -> Tuple[Optional[List[str]], bool, List[str
     else:
         complete = h.is_complete("races") and all(r.country for r in h.starts_list())
     return countries, complete, used
+
+
+def start_entries(h: Horse) -> Optional[List[Tuple[int, Race, Optional[str]]]]:
+    """
+    Each start as (position in races, race, W/DH/L code or None). Void races are
+    left out. The codes come from results when it is recorded, since
+    validation keeps it in step with the starts, and from the races otherwise.
+    """
+    if h.races is None:
+        return None
+    starts = [(i, r) for i, r in enumerate(h.races, start=1) if r.counts_as_start]
+    codes = h.results if h.results is not None else [r.result_code for _, r in starts]
+    return [(i, r, code) for (i, r), code in zip(starts, codes)]
 
 
 # ============================================================
@@ -335,8 +348,15 @@ def eval_nickname(h: Horse, p: Dict[str, Any]) -> Finding:
 
 @evaluator("title", required=("text",))
 def eval_title(h: Horse, p: Dict[str, Any]) -> Finding:
-    """Won the named race. mode: exact (default) | contains."""
-    return _list_match(h, "major_titles", p["text"], p.get("mode", "exact"), "Title")
+    """Won the named race, by major_titles or by a won race record. mode: exact (default) | contains."""
+    text, mode = p["text"], p.get("mode", "exact")
+    finding = _list_match(h, "major_titles", text, mode, "Title")
+    if finding.status == M:
+        return finding
+    for i, r, code in start_entries(h) or []:
+        if code in WIN_CODES and r.race and text_matches(text, r.race, mode):
+            return Finding(M, f"Won {r.describe(i)}.", ["races"])
+    return finding
 
 
 @evaluator("record", required=("text",))
@@ -352,3 +372,211 @@ def eval_person(h: Horse, p: Dict[str, Any]) -> Finding:
     if role not in ("trainer", "jockey", "owner"):
         raise ValueError("person clue role must be trainer, jockey, or owner")
     return _list_match(h, role + "s", p["name"], p.get("mode", "contains"), role.capitalize())
+
+
+
+# ============================================================
+# Race pattern clue
+# ============================================================
+
+YES, NO, MAYBE = "yes", "no", "maybe"
+RACE_FILTER_KEYS = ("race", "mode", "country", "venue", "grade", "surface",
+                    "year_min", "year_max", "age_min", "age_max", "abroad", "exclude_walkovers")
+QUANTIFIERS = ("won_any", "lost_any", "won_all", "count", "first", "last")
+RESULTS = ("won", "lost")
+
+
+def _check(value: Any, test: Callable[[Any], bool]) -> Optional[bool]:
+    return None if value is None else test(value)
+
+
+def _age_fits(h: Horse, r: Race, lo: Optional[int], hi: Optional[int]) -> Optional[bool]:
+    """Either age fitting is enough. If neither known age fits and one is unknown, the race may still fit."""
+    age = h.age_at(r)
+    if age is None:
+        return None
+    if any((lo is None or a >= lo) and (hi is None or a <= hi) for a in age.known):
+        return True
+    if age.by_foaling_country is None or age.by_race_country is None:
+        return None
+    return False
+
+
+def race_filter(h: Horse, r: Race, p: Dict[str, Any]) -> str:
+    """YES if the race meets every filter in p, NO if it fails one, MAYBE if missing data leaves it open."""
+    checks: List[Optional[bool]] = []
+    if "race" in p:
+        checks.append(_check(r.race, lambda v: text_matches(p["race"], v, p.get("mode", "exact"))))
+    if "country" in p:
+        checks.append(_check(r.country, lambda v: v == normalize_country(p["country"])))
+    if "venue" in p:
+        checks.append(_check(r.venue, lambda v: text_matches(p["venue"], v, "contains")))
+    if "grade" in p:
+        checks.append(_check(r.grade_key, lambda v: v == normalize_grade(p["grade"])))
+    if "surface" in p:
+        checks.append(_check(r.surface, lambda v: text_matches(p["surface"], v, "exact")))
+    if "year_min" in p or "year_max" in p:
+        lo, hi = p.get("year_min"), p.get("year_max")
+        checks.append(_check(r.date, lambda v: (lo is None or int(v[:4]) >= int(lo)) and (hi is None or int(v[:4]) <= int(hi))))
+    if "age_min" in p or "age_max" in p:
+        lo, hi = p.get("age_min"), p.get("age_max")
+        checks.append(_age_fits(h, r, None if lo is None else int(lo), None if hi is None else int(hi)))
+    if "abroad" in p:
+        known = r.country is not None and h.country is not None
+        checks.append((r.country != h.country) == bool(p["abroad"]) if known else None)
+    if p.get("exclude_walkovers") and r.is_walkover:
+        checks.append(False)
+    if False in checks:
+        return NO
+    return MAYBE if None in checks else YES
+
+
+def _won(code: Optional[str]) -> Optional[bool]:
+    return None if code is None else code in WIN_CODES
+
+
+def _range_text(lo: Any, hi: Any) -> str:
+    if lo is not None and lo == hi:
+        return str(lo)
+    if hi is None:
+        return f"{lo} or later"
+    return f"{hi} or earlier" if lo is None else f"{lo} to {hi}"
+
+
+def _sentence(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+def _filter_text(p: Dict[str, Any]) -> str:
+    parts = []
+    if "race" in p:
+        parts.append(f"named '{p['race']}'")
+    for key, word in (("country", "in"), ("venue", "at"), ("grade", "graded"), ("surface", "on")):
+        if key in p:
+            parts.append(f"{word} {p[key]}")
+    if "year_min" in p or "year_max" in p:
+        parts.append(f"in {_range_text(p.get('year_min'), p.get('year_max'))}")
+    if "age_min" in p or "age_max" in p:
+        parts.append(f"at age {_range_text(p.get('age_min'), p.get('age_max'))}")
+    if "abroad" in p:
+        parts.append("abroad" if p["abroad"] else "at home")
+    if p.get("exclude_walkovers"):
+        parts.append("walkovers excluded")
+    return "races " + ", ".join(parts) if parts else "all races"
+
+
+def _race_fields(h: Horse, p: Dict[str, Any]) -> List[str]:
+    fields = ["races"] + (["results"] if h.results is not None else [])
+    if "abroad" in p or "age_min" in p or "age_max" in p:
+        fields.append("country")
+    if "age_min" in p or "age_max" in p:
+        fields.append("foaled")
+    return fields
+
+
+def _count_settles(op: str, n: int, lo: int, hi: Optional[int]) -> Optional[bool]:
+    """
+    Whether every possible count from lo to hi passes (True) or fails (False)
+    the comparison with n. hi is None when a partial list leaves no upper bound.
+    None when the possible counts disagree.
+    """
+    if op == "eq":
+        if hi is not None and lo == hi == n:
+            return True
+        if n < lo or (hi is not None and n > hi):
+            return False
+    elif op == "gte":
+        if lo >= n:
+            return True
+        if hi is not None and hi < n:
+            return False
+    else:
+        if hi is not None and hi <= n:
+            return True
+        if lo > n:
+            return False
+    return None
+
+
+def _validate_race_params(p: Dict[str, Any]) -> Tuple[str, Optional[str]]:
+    q = p["quantifier"]
+    unknown = sorted(set(p) - set(RACE_FILTER_KEYS) - {"quantifier", "op", "n", "result"})
+    if unknown:
+        raise ValueError(f"race clue has unknown params {unknown}")
+    if q not in QUANTIFIERS:
+        raise ValueError(f"race clue quantifier must be one of {list(QUANTIFIERS)}")
+    result = p.get("result")
+    if result is not None and result not in RESULTS:
+        raise ValueError(f"race clue result must be one of {list(RESULTS)}")
+    if q in ("first", "last") and result is None:
+        raise ValueError(f"race clue with quantifier '{q}' needs result: won or lost")
+    if q == "count" and (p.get("op") not in _COMPARE or "n" not in p):
+        raise ValueError(f"race clue with quantifier 'count' needs op ({'|'.join(_COMPARE)}) and n")
+    return q, result
+
+
+@evaluator("race", required=("quantifier",))
+def eval_race(h: Horse, p: Dict[str, Any]) -> Finding:
+    """Pattern over race records. quantifier: won_any | lost_any | won_all | count (op, n, optional result) | first | last (result: won|lost). Filters: race (with mode), country, venue, grade, surface, year_min, year_max, age_min, age_max, abroad, exclude_walkovers."""
+    q, result = _validate_race_params(p)
+    entries = start_entries(h)
+    if entries is None:
+        return Finding(U, "No race records.", [])
+    fields = _race_fields(h, p)
+    what = _filter_text(p)
+    complete = h.is_complete("races") or (h.results is not None and h.is_complete("results"))
+    rows = [(i, r, race_filter(h, r, p), _won(code)) for i, r, code in entries]
+    partial = "" if complete else " The race list is not marked complete."
+
+    if q in ("won_any", "lost_any"):
+        want = q == "won_any"
+        verb = "won" if want else "lost"
+        hit = next(((i, r) for i, r, f, w in rows if f == YES and w is want), None)
+        if hit:
+            return Finding(M, f"{_sentence(hit[1].describe(hit[0]))} is one of the {what}, and it was {verb}.", fields)
+        if complete and all(f == NO or w is (not want) for _, _, f, w in rows):
+            return Finding(X, f"Complete race list has no {verb} race among the {what}.", fields)
+        return Finding(U, f"No {verb} race is recorded among the {what}, but missing data leaves it open.{partial}", fields)
+
+    if q == "won_all":
+        lost = next(((i, r) for i, r, f, w in rows if f == YES and w is False), None)
+        if lost:
+            return Finding(X, f"{_sentence(lost[1].describe(lost[0]))} is one of the {what}, and it was lost.", fields)
+        matched = [(i, r) for i, r, f, _ in rows if f == YES]
+        if complete and matched and all(f == NO or w is True for _, _, f, w in rows):
+            return Finding(M, f"Won all {len(matched)} of the {what}.", fields)
+        if complete and not matched and all(f == NO for _, _, f, _ in rows):
+            return Finding(U, f"Complete race list has none of the {what}, so there is nothing to have won.", fields)
+        return Finding(U, f"No loss recorded among the {what}, but missing data leaves it open.{partial}", fields)
+
+    if q == "count":
+        op, n = p["op"], int(p["n"])
+        def certain(w):
+            return result is None or w is (result == "won")
+        def possible(w):
+            return result is None or w is None or w is (result == "won")
+        lo = sum(f == YES and certain(w) for _, _, f, w in rows)
+        hi = sum(f != NO and possible(w) for _, _, f, w in rows) if complete else None
+        words = _COMPARE[op][1]
+        label = what + (f" {result}" if result else "")
+        count_text = f"{lo}" if hi == lo else (f"between {lo} and {hi}" if hi is not None else f"at least {lo}")
+        settled = _count_settles(op, n, lo, hi)
+        if settled is None:
+            return Finding(U, f"Count of {label}: {count_text}, which does not settle {words} {n}.{partial}", fields)
+        return Finding(M if settled else X, f"Count of {label}: {count_text} (clue: {words} {n}).", fields)
+
+    # first / last
+    if not complete:
+        return Finding(U, f"The race list is not marked complete, so the {q} of the {what} is not known.", fields)
+    ordered = rows if q == "first" else list(reversed(rows))
+    for i, r, f, w in ordered:
+        if f == NO:
+            continue
+        if f == MAYBE:
+            return Finding(U, f"{_sentence(r.describe(i))} may be one of the {what}, so the {q} one is not known.", fields)
+        if w is None:
+            return Finding(U, f"The {q} of the {what} is {r.describe(i)}, but its result is not recorded.", fields)
+        verb = "won" if w else "lost"
+        status = M if verb == result else X
+        return Finding(status, f"The {q} of the {what} is {r.describe(i)}, which was {verb}.", fields)
+    return Finding(X, f"Complete race list has none of the {what}.", fields)

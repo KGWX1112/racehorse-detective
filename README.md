@@ -100,6 +100,27 @@ A hard clue that contradicts eliminates the horse. A match adds the weight, a so
 
 The verdict is one of four codes. `NO_MATCH` means no horse survived the hard clues. `TIE` means two or more survivors share the top score. `SOLVED` means one horse matched every clue and every other survivor contradicts at least one clue. `LEADING` covers every other case where one horse has the top score, and the report says what keeps it from `SOLVED`: its own unknowns or contradictions, or other survivors that nothing has ruled out.
 
+## The race clue
+
+The `race` clue tests a pattern over a horse's race records. A filter picks the races, and a quantifier says what must be true of them. Void races are never included.
+
+```json
+{"description": "Lost on its first start abroad", "type": "race",
+ "params": {"quantifier": "first", "abroad": true, "result": "lost"}, "hard": true}
+```
+
+The filter keys are `race` (a name, with `mode`, default `exact`), `country`, `venue` (whole-word match), `grade` (compared after normalization), `surface`, `year_min`, `year_max`, `age_min`, `age_max`, `abroad` (the race country differs from the country of foaling), and `exclude_walkovers`. A race meets the filter, fails it, or is left open when data the filter needs is missing. An age filter accepts a race if either of its two ages fits. If neither known age fits and the other age is unknown, the race is left open.
+
+| Quantifier | Match | Contradiction | Unknown |
+|---|---|---|---|
+| `won_any` | a matching race was won | complete list, and no race could be a matching win | otherwise |
+| `lost_any` | a matching race was lost | complete list, and no race could be a matching loss | otherwise |
+| `won_all` | complete list, at least one match, and every race that could match was won | a matching race was lost, even in a partial list | otherwise, including a complete list with no matching race |
+| `count` (`op`, `n`, optional `result`) | every possible count passes | every possible count fails | a partial list or open races leave counts on both sides |
+| `first`, `last` (`result`) | complete list, and the first or last matching race has that result | complete list, and it has the other result or no race matches | a partial list, an open race before it, or an unknown result |
+
+`result` is `won` or `lost`. A walkover counts as a win unless `exclude_walkovers` is set, and then it is skipped. The `title` clue also accepts a won race whose name matches, so a race record can prove a title that the title list does not hold.
+
 ## Case file format
 
 ```json
@@ -121,9 +142,9 @@ Text clues match whole words after lowercasing and stripping punctuation, so "Mo
 
 ## Benchmark
 
-`cases/benchmarks.json` has twelve cases against the eight seed horses. The first nine come from V0.1. They cover the prototype case in soft and hard form (both end in a tie, because Crimson Monarch's longest streak is six), elimination by title and date, inference from a summary-only career, a sparse-data horse that stays unresolved, a no-match case, counts derived from a complete race list, international status derived from venues, and word-boundary matching. The other three cover race records: a career derived from a complete race list, racing abroad shown by a partial race list, and a streak that stays unknown on a partial race list.
+`cases/benchmarks.json` has eighteen cases against the ten seed horses. The first nine come from V0.1. They cover the prototype case in soft and hard form (both end in a tie, because Crimson Monarch's longest streak is six), elimination by title and date, inference from a summary-only career, a sparse-data horse that stays unresolved, a no-match case, counts derived from a complete race list, international status derived from venues, and word-boundary matching. Three more cover race records: a career derived from a complete race list, racing abroad shown by a partial race list, and a streak that stays unknown on a partial race list. The last six cover the race clue and titles: a win at age 4 that fits only under the race country's birthday, a loss on the first start abroad, a horse unbeaten at Group 1 level, a partial list that contradicts unbeaten at Group 3 level, a first start abroad left unknown on a partial list, and a title proven from a won race.
 
-All eight seed horses are fictional. Old Tempest and Harbor Lantern were added to test horses with a career summary and no race order. Copper Wren has a complete race list that includes a walkover, a void race, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first. Juniper Vale has a career summary and a partial race list.
+All ten seed horses are fictional. Old Tempest and Harbor Lantern were added to test horses with a career summary and no race order. Copper Wren has a complete race list that includes a walkover, a void race, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first. Juniper Vale has a career summary and a partial race list. Wattle Crown, foaled in AUS, won in GB at an age that differs between the two birthdays. Marram Grey lost its first start abroad and won both its Group 1 races.
 
 Run the benchmark after every change. Add a case each time you find a behavior you want to keep.
 
@@ -137,13 +158,15 @@ Write a function in `horsedetective/evaluators.py` that takes a horse and the cl
 
 ## Known limits
 
-Race records store dates, venues, grades, and distances, but no clue type reads those fields yet. The evaluators see only the codes, counts, and countries derived from them.
+The streak, unbeaten, career, and international clues still read only the codes, counts, and countries derived from race records. The `race` clue reads the race details directly. Distance has no filter yet.
 
 If any race in a list has an unknown result, the derived code sequence as a whole is unknown. Streak clues then return unknown for that horse, even when the known races would settle them.
 
 Grade matching knows the G, Group, Grade, Jpn, and Listed forms. Other published grades compare as plain text.
 
-No clue type reads racing ages yet. Validation rejects a race dated before the foaling year, but nothing checks whether an age is plausible for racing.
+Validation rejects a race dated before the foaling year, but nothing checks whether an age is plausible for racing. A race with no country leaves an age filter open whenever the foaling-country age does not fit, so age clues are often unknown for horses whose races have no country.
+
+A complete race list never contradicts a `title` clue, because a race name in the records can differ from the name a clue uses. Aliases for renamed races come in V0.3.
 
 Title matching has no aliases, so a race that was renamed or sponsored under different names needs each name entered. Synonyms are V0.3.
 

@@ -113,6 +113,61 @@
         {"description": "Won at least two in a row", "type": "win_streak", "params": {"min": 2}, "hard": true}
       ],
       "expected": {"verdict": "LEADING", "answer": "juniper-vale-fr-1966"}
+    },
+    {
+      "name": "won-at-age-4-either-birthday",
+      "notes": "Wattle Crown won the Harwell Cup in GB in May 1987. It is 3 under the AUS birthday and 4 under the GB birthday, and either age fitting is enough.",
+      "clues": [
+        {"description": "Foaled in Australia", "type": "country", "params": {"code": "AUS"}, "hard": true},
+        {"description": "Foaled in the 1980s", "type": "foaled", "params": {"min": 1980, "max": 1989}, "hard": true},
+        {"description": "Won a race at age 4", "type": "race", "params": {"quantifier": "won_any", "age_min": 4, "age_max": 4}, "hard": true}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "wattle-crown-aus-1983"}
+    },
+    {
+      "name": "lost-first-start-abroad",
+      "notes": "Marram Grey lost its first start abroad. Copper Wren and Wattle Crown won theirs.",
+      "clues": [
+        {"description": "Foaled between 1970 and 1989", "type": "foaled", "params": {"min": 1970, "max": 1989}, "hard": true},
+        {"description": "Lost on its first start abroad", "type": "race", "params": {"quantifier": "first", "abroad": true, "result": "lost"}, "hard": true}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "marram-grey-gb-1977"}
+    },
+    {
+      "name": "unbeaten-at-g1",
+      "notes": "Marram Grey won both Group 1 starts, published as \"Group 1\" and \"G1\". Copper Wren and Wattle Crown each lost at that level.",
+      "clues": [
+        {"description": "Foaled between 1970 and 1989", "type": "foaled", "params": {"min": 1970, "max": 1989}, "hard": true},
+        {"description": "Unbeaten at Group 1 level", "type": "race", "params": {"quantifier": "won_all", "grade": "G1"}, "hard": true}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "marram-grey-gb-1977"}
+    },
+    {
+      "name": "won-all-contradicted-by-partial-list",
+      "notes": "Juniper Vale's race list is partial, but it includes a Group 3 loss, which is enough to contradict unbeaten at that level.",
+      "clues": [
+        {"description": "Foaled in the 1960s", "type": "foaled", "params": {"min": 1960, "max": 1969}, "hard": true},
+        {"description": "Unbeaten at Group 3 level", "type": "race", "params": {"quantifier": "won_all", "grade": "Group 3"}, "hard": true}
+      ],
+      "expected": {"verdict": "NO_MATCH", "answer": null}
+    },
+    {
+      "name": "first-unknown-on-partial-list",
+      "notes": "Juniper Vale's first recorded start abroad was a loss, but the list is partial, so an earlier start abroad may be missing.",
+      "clues": [
+        {"description": "Foaled in the 1960s", "type": "foaled", "params": {"min": 1960, "max": 1969}, "hard": true},
+        {"description": "Lost on its first start abroad", "type": "race", "params": {"quantifier": "first", "abroad": true, "result": "lost"}, "hard": true}
+      ],
+      "expected": {"verdict": "LEADING", "answer": "juniper-vale-fr-1966"}
+    },
+    {
+      "name": "title-proven-from-races",
+      "notes": "Wattle Crown has no title list, but its race records show it won the Coolah Cup. Copper Wren has no record of that race and is not ruled out.",
+      "clues": [
+        {"description": "Foaled in the 1980s", "type": "foaled", "params": {"min": 1980, "max": 1989}, "hard": true},
+        {"description": "Won the Coolah Cup", "type": "title", "params": {"text": "Coolah Cup"}, "hard": true}
+      ],
+      "expected": {"verdict": "LEADING", "answer": "wattle-crown-aus-1983"}
     }
   ]
 }

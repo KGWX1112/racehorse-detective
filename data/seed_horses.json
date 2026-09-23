@@ -98,6 +98,39 @@
       ],
       "notes": "Fictional. Career summary plus three of its six races; the race list is partial.",
       "sources": {"*": "V0.2 test data (fictional)"}
+    },
+    {
+      "name": "Wattle Crown",
+      "country": "AUS",
+      "foaled": 1983,
+      "nicknames": ["The Crown"],
+      "races": [
+        {"date": "1985-11-09", "race": "Blackwood Plate", "venue": "Kirrabee", "country": "AUS", "finish": 2, "field_size": 10},
+        {"date": "1986-03-15", "race": "Kirrabee Stakes", "venue": "Kirrabee", "country": "AUS", "grade": "G2", "finish": 1, "field_size": 12},
+        {"date": "1986-10-04", "race": "Coolah Cup", "venue": "Coolah", "country": "AUS", "grade": "Group 1", "finish": 1, "field_size": 14},
+        {"date": "1987-05-30", "race": "Harwell Cup", "venue": "Harwell", "country": "GB", "grade": "G1", "finish": 1, "field_size": 9},
+        {"date": "1987-06-20", "race": "Pennock Stakes", "venue": "Harrowgate", "country": "GB", "grade": "G2", "finish": 3, "field_size": 8},
+        {"date": "1987-10-17", "race": "Coolah Cup", "venue": "Coolah", "country": "AUS", "grade": "G1", "finish": 2, "field_size": 15}
+      ],
+      "complete_fields": ["races", "nicknames"],
+      "notes": "Fictional. Foaled in AUS, so it turns 4 on 1 August 1987 under its own country's birthday. Its only win at 4 under the GB birthday is the Harwell Cup in May 1987.",
+      "sources": {"*": "V0.2 test data (fictional)"}
+    },
+    {
+      "name": "Marram Grey",
+      "country": "GB",
+      "foaled": 1977,
+      "races": [
+        {"date": "1979-05-12", "race": "Oakhurst Stakes", "venue": "Ashcombe", "country": "GB", "finish": 1, "field_size": 9},
+        {"date": "1979-08-19", "race": "Prix de Lisle", "venue": "Saint-Aubin", "country": "FR", "grade": "G3", "finish": 5, "field_size": 11},
+        {"date": "1980-04-26", "race": "Greywell Stakes", "venue": "Fellbrook", "country": "GB", "grade": "Listed", "finish": 1, "field_size": 7},
+        {"date": "1980-06-14", "race": "Pennock Stakes", "venue": "Harrowgate", "country": "GB", "grade": "G2", "finish": 1, "field_size": 6},
+        {"date": "1980-09-07", "race": "Carrowmore Stakes", "venue": "Carrowmore", "country": "IRE", "grade": "Group 1", "finish": 1, "field_size": 10},
+        {"date": "1980-10-05", "race": "Prix du Verger", "venue": "Saint-Aubin", "country": "FR", "grade": "G1", "finish": 1, "field_size": 12}
+      ],
+      "complete_fields": ["races"],
+      "notes": "Fictional. Lost its first start abroad; won both of its Group 1 starts, published as \"Group 1\" and \"G1\".",
+      "sources": {"*": "V0.2 test data (fictional)"}
     }
   ]
 }

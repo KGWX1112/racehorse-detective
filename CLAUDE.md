@@ -27,7 +27,7 @@ Python 3.9 or later. The core package uses only the standard library. Any new de
 | `horsedetective/store.py` | SQLite storage (validated JSON per row) |
 | `horsedetective/text.py` | Normalization, whole-word matching, country suffixes |
 | `horsedetective/cli.py` | argparse commands |
-| `data/seed_horses.json` | Eight fictional test horses |
+| `data/seed_horses.json` | Ten fictional test horses |
 | `cases/benchmarks.json` | Cases with expected verdicts |
 | `tests/` | `unittest` tests, run with `python -m unittest` |
 
