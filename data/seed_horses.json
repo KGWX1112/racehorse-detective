@@ -1,0 +1,69 @@
+{
+  "horses": [
+    {
+      "name": "Silver Comet",
+      "country": "JPN",
+      "foaled": 2001,
+      "results": ["W", "W", "W", "W", "W", "W", "W", "L", "W", "W", "L"],
+      "nicknames": ["The Silver Bullet"],
+      "international": true,
+      "records": ["Track record at Tokyo"],
+      "major_titles": ["Japan Cup"],
+      "complete_fields": ["results", "major_titles"],
+      "sources": {"*": "Prototype sample data (fictional)"}
+    },
+    {
+      "name": "Crimson Monarch",
+      "country": "USA",
+      "foaled": 1998,
+      "results": ["W", "W", "W", "W", "W", "W", "L", "W", "W"],
+      "nicknames": ["The Monarch"],
+      "international": true,
+      "records": ["Speed record"],
+      "major_titles": ["Kentucky Derby"],
+      "complete_fields": ["results", "major_titles"],
+      "sources": {"*": "Prototype sample data (fictional)"}
+    },
+    {
+      "name": "Northern Star",
+      "country": "GB",
+      "foaled": 2003,
+      "results": ["W", "W", "L", "W", "W", "W", "W", "L"],
+      "nicknames": ["The Northern Rocket"],
+      "international": false,
+      "records": ["Course record"],
+      "major_titles": ["Epsom Derby"],
+      "complete_fields": ["results", "major_titles"],
+      "sources": {"*": "Prototype sample data (fictional)"}
+    },
+    {
+      "name": "Golden Arrow",
+      "country": "AUS",
+      "foaled": 1999,
+      "results": ["W", "W", "W", "W", "W", "W", "W", "L"],
+      "nicknames": ["The Golden Arrow"],
+      "international": true,
+      "records": ["Australian speed record"],
+      "major_titles": ["Melbourne Cup"],
+      "complete_fields": ["results", "major_titles"],
+      "sources": {"*": "Prototype sample data (fictional)"}
+    },
+    {
+      "name": "Old Tempest",
+      "country": "GB",
+      "foaled": 1871,
+      "summary": {"starts": 30, "wins": 30},
+      "notes": "Fictional. Summary-only record, standing in for a 19th-century horse whose race order is not available.",
+      "sources": {"*": "V0.1 test data (fictional)"}
+    },
+    {
+      "name": "Harbor Lantern",
+      "country": "IRE",
+      "foaled": 1955,
+      "summary": {"starts": 12, "wins": 9, "seconds": 2, "thirds": 1},
+      "raced_countries": ["IRE", "GB", "FR"],
+      "notes": "Fictional. Summary plus venues, no race order and no title list.",
+      "sources": {"*": "V0.1 test data (fictional)", "raced_countries": "V0.1 test data (fictional), venue list"}
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "cases": [
+    {
+      "name": "prototype-case-soft",
+      "notes": "Prototype clues, all soft. Crimson Monarch's streak is six, so no horse fits all four.",
+      "clues": [
+        {"description": "Won at least seven consecutive races", "type": "win_streak", "params": {"min": 7}, "weight": 10},
+        {"description": "Lost immediately after the seven-win streak", "type": "loss_after_streak", "params": {"min": 7}, "weight": 10},
+        {"description": "Had an international racing connection", "type": "international", "params": {"value": true}, "weight": 5},
+        {"description": "Nickname contains 'Monarch'", "type": "nickname", "params": {"text": "Monarch"}, "weight": 8}
+      ],
+      "expected": {"verdict": "TIE", "answer": null}
+    },
+    {
+      "name": "prototype-case-hard-streaks",
+      "notes": "Same clues with the streak facts as hard constraints.",
+      "clues": [
+        {"description": "Won at least seven consecutive races", "type": "win_streak", "params": {"min": 7}, "hard": true},
+        {"description": "Lost immediately after the seven-win streak", "type": "loss_after_streak", "params": {"min": 7}, "hard": true},
+        {"description": "Had an international racing connection", "type": "international", "params": {"value": true}, "weight": 5},
+        {"description": "Nickname contains 'Monarch'", "type": "nickname", "params": {"text": "Monarch"}, "weight": 8}
+      ],
+      "expected": {"verdict": "TIE", "answer": null}
+    },
+    {
+      "name": "kentucky-monarch",
+      "clues": [
+        {"description": "Won the Kentucky Derby", "type": "title", "params": {"text": "Kentucky Derby"}, "hard": true},
+        {"description": "Nickname contains 'Monarch'", "type": "nickname", "params": {"text": "Monarch"}, "weight": 8},
+        {"description": "Foaled in 1990 or later", "type": "foaled", "params": {"min": 1990}, "hard": true}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "crimson-monarch-usa-1998"}
+    },
+    {
+      "name": "kentucky-monarch-no-date",
+      "notes": "Without the date clue, horses with no recorded titles cannot be ruled out.",
+      "clues": [
+        {"description": "Won the Kentucky Derby", "type": "title", "params": {"text": "Kentucky Derby"}, "hard": true},
+        {"description": "Nickname contains 'Monarch'", "type": "nickname", "params": {"text": "Monarch"}, "weight": 8}
+      ],
+      "expected": {"verdict": "LEADING", "answer": "crimson-monarch-usa-1998"}
+    },
+    {
+      "name": "unbeaten-victorian",
+      "notes": "Tests inference from a career summary with no race order.",
+      "clues": [
+        {"description": "Never beaten in at least 20 starts", "type": "unbeaten", "params": {"min_starts": 20}, "hard": true},
+        {"description": "Foaled before 1900", "type": "foaled", "params": {"max": 1899}, "hard": true}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "old-tempest-gb-1871"}
+    },
+    {
+      "name": "long-streak-sparse-data",
+      "notes": "Harbor Lantern has 9 wins but no race order, so it stays unresolved rather than penalized.",
+      "clues": [
+        {"description": "Won at least eight in a row", "type": "win_streak", "params": {"min": 8}, "hard": true}
+      ],
+      "expected": {"verdict": "LEADING", "answer": "old-tempest-gb-1871"}
+    },
+    {
+      "name": "japanese-pre-war",
+      "clues": [
+        {"description": "Foaled in Japan", "type": "country", "params": {"code": "Japan"}, "hard": true},
+        {"description": "Foaled before 1950", "type": "foaled", "params": {"max": 1949}, "hard": true}
+      ],
+      "expected": {"verdict": "NO_MATCH", "answer": null}
+    },
+    {
+      "name": "irish-traveller",
+      "notes": "Tests counts derived from a complete race list and international status derived from venues.",
+      "clues": [
+        {"description": "Raced outside its home country", "type": "international", "params": {"value": true}, "hard": true},
+        {"description": "Twelve career starts", "type": "career", "params": {"field": "starts", "op": "eq", "n": 12}, "hard": true},
+        {"description": "Nine career wins", "type": "career", "params": {"field": "wins", "op": "eq", "n": 9}, "hard": true}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "harbor-lantern-ire-1955"}
+    },
+    {
+      "name": "nickname-word-boundary",
+      "notes": "'Arrow' matches 'The Golden Arrow'; 'Arr' must not match anything.",
+      "clues": [
+        {"description": "Nickname contains 'Arr'", "type": "nickname", "params": {"text": "Arr"}, "weight": 10},
+        {"description": "Foaled in Australia", "type": "country", "params": {"code": "AUS"}, "hard": true}
+      ],
+      "expected": {"verdict": "LEADING", "answer": "golden-arrow-aus-1999"}
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Original prototype case",
+  "notes": "The four clues from the prototype, all soft, run under V0.1 rules.",
+  "clues": [
+    {"description": "Won at least seven consecutive races", "type": "win_streak", "params": {"min": 7}, "weight": 10},
+    {"description": "Lost immediately after the seven-win streak", "type": "loss_after_streak", "params": {"min": 7}, "weight": 10},
+    {"description": "Had an international racing connection", "type": "international", "params": {"value": true}, "weight": 5},
+    {"description": "Nickname contains 'Monarch'", "type": "nickname", "params": {"text": "Monarch"}, "weight": 8}
+  ]
+}
