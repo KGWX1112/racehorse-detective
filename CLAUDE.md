@@ -61,13 +61,3 @@ Do not add real horses, or facts about real horses, from model knowledge. Real d
 ## Writing conventions
 
 These apply to the README, docs, report text, comments, and commit messages. No em dashes. Sentence case headings. Active voice. Prose over bullets in narrative sections. No inflated or promotional language, no filler, no praise. State limits and uncertainty plainly.
-
-## Known issues from V0.1
-
-The v0.2 plan schedules fixes for these.
-
-1. The `international` evaluator says "No record of where the horse raced" when `raced_countries` exists but `country` is unknown. The message should say the country of foaling is unknown.
-2. The `clues` command opens or creates the database file although it never uses it.
-3. Replacing `results` on a horse whose results are marked complete keeps the complete mark. `set` should warn.
-4. Piping CLI output to `head` raises `BrokenPipeError`.
-5. The repo has no `.gitignore`. Ignore `*.db`, `__pycache__/`, and `CLAUDE.local.md`.
