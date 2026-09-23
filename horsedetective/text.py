@@ -46,5 +46,28 @@ def text_matches(target: str, candidate: str, mode: str) -> bool:
     return f" {t} " in f" {c} "
 
 
+_GRADE_NUMBERS = {
+    "1": "1", "2": "2", "3": "3",
+    "i": "1", "ii": "2", "iii": "3",
+    "one": "1", "two": "2", "three": "3",
+}
+_GRADE_RE = re.compile(r"(?:g|gr|grade|group) ?(1|2|3|i{1,3}|one|two|three)")
+
+
+def normalize_grade(text: str) -> str:
+    """
+    Comparable form of a published grade. "G1", "Group 1", "Grade 1", "Gr. 1",
+    and "Grade I" all give "G1". "Listed", "LR", and "L" give "LISTED". Any
+    other text is normalized, so identical published grades still compare equal.
+    """
+    t = normalize(text)
+    m = _GRADE_RE.fullmatch(t)
+    if m:
+        return "G" + _GRADE_NUMBERS[m.group(1)]
+    if t in ("listed", "listed race", "lr", "l"):
+        return "LISTED"
+    return t
+
+
 def slugify(text: str) -> str:
     return re.sub(r"[\W_]+", "-", str(text).casefold()).strip("-")

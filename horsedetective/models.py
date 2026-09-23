@@ -11,22 +11,53 @@ Conventions that the evaluators rely on:
   field without its own entry. Career summary fields share the key "summary".
 * results is the ordered race sequence: W = win, DH = dead heat for first
   (counts as a win), L = any non-winning finish.
+* races is the ordered list of race records. Each record's W/DH/L code comes
+  from its official finish and outcome (see Race.result_code). When results
+  and races are both recorded, validation requires them to agree.
 """
 
+import calendar
+import re
 from dataclasses import asdict, dataclass, field, fields
-from typing import Any, Dict, List, Optional
+from datetime import date
+from typing import Any, Dict, List, Optional, Tuple
 
-from .text import normalize_country, slugify
+from .text import normalize, normalize_country, normalize_grade, slugify
 
 RESULT_CODES = ("W", "DH", "L")
 WIN_CODES = ("W", "DH")
+
+# The official result decides the code: a horse demoted from first loses, and
+# a horse promoted to first wins. A walkover counts as a win and a start.
+NON_FINISH_OUTCOMES = (
+    "fell", "pulled_up", "unseated", "refused", "brought_down", "ran_out", "did_not_finish",
+)
+OUTCOMES = ("finished", "dead_heat", "walkover", "disqualified", "promoted") + NON_FINISH_OUTCOMES
 
 LIST_FIELDS = (
     "nicknames", "trainers", "jockeys", "owners",
     "major_titles", "records", "raced_countries",
 )
-COMPLETABLE_FIELDS = LIST_FIELDS + ("results",)
+COMPLETABLE_FIELDS = LIST_FIELDS + ("results", "races")
 SUMMARY_FIELDS = ("starts", "wins", "seconds", "thirds")
+
+_DATE_RE = re.compile(r"(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?")
+
+
+def date_bounds(text: str) -> Tuple[date, date]:
+    """First and last day a partial ISO 8601 date can mean. "1875" covers the whole year."""
+    m = _DATE_RE.fullmatch(str(text))
+    if not m:
+        raise ValueError(f"date '{text}' is not YYYY, YYYY-MM, or YYYY-MM-DD")
+    year, month, day = (int(g) if g else None for g in m.groups())
+    try:
+        if month is None:
+            return date(year, 1, 1), date(year, 12, 31)
+        if day is None:
+            return date(year, month, 1), date(year, month, calendar.monthrange(year, month)[1])
+        return date(year, month, day), date(year, month, day)
+    except ValueError:
+        raise ValueError(f"date '{text}' is not a calendar date") from None
 
 
 def make_horse_id(name: str, country: Optional[str], foaled: Optional[int]) -> str:
@@ -46,6 +77,103 @@ class CareerSummary:
 
     def is_empty(self) -> bool:
         return all(getattr(self, f) is None for f in SUMMARY_FIELDS)
+
+
+@dataclass
+class Race:
+    """One start. Every field is optional; None means not recorded."""
+    date: Optional[str] = None           # ISO 8601, partial allowed: "1875", "1875-06", "1875-06-12"
+    race: Optional[str] = None           # name as published
+    venue: Optional[str] = None
+    country: Optional[str] = None        # normalized suffix
+    grade: Optional[str] = None          # as published; compare with grade_key
+    distance_m: Optional[float] = None
+    distance_text: Optional[str] = None  # as published, e.g. "1m 2f"
+    surface: Optional[str] = None
+    finish: Optional[int] = None         # official position, 1 = won
+    outcome: Optional[str] = None        # one of OUTCOMES
+    field_size: Optional[int] = None
+    jockey: Optional[str] = None
+    trainer: Optional[str] = None
+    notes: Optional[str] = None
+    source: Optional[str] = None
+
+    def __post_init__(self):
+        if isinstance(self.date, int) and not isinstance(self.date, bool):
+            self.date = str(self.date)
+        if isinstance(self.date, str):
+            self.date = self.date.strip() or None
+        self.country = normalize_country(self.country) if self.country else None
+        if self.outcome is not None:
+            self.outcome = normalize(self.outcome).replace(" ", "_")
+
+    @property
+    def result_code(self) -> Optional[str]:
+        """W, DH, or L from the official result, or None when the record does not say."""
+        if self.outcome == "walkover":
+            return "W"
+        if self.outcome == "disqualified" or self.outcome in NON_FINISH_OUTCOMES:
+            return "L"
+        if self.finish is None:
+            return None
+        if self.finish != 1:
+            return "L"
+        return "DH" if self.outcome == "dead_heat" else "W"
+
+    @property
+    def is_walkover(self) -> bool:
+        return self.outcome == "walkover"
+
+    @property
+    def grade_key(self) -> Optional[str]:
+        return normalize_grade(self.grade) if self.grade else None
+
+    def describe(self, index: int) -> str:
+        parts = [p for p in (self.race, self.date) if p]
+        return f"race {index}" + (f" ({', '.join(parts)})" if parts else "")
+
+    def problems(self) -> List[str]:
+        out = []
+        if self.date is not None:
+            try:
+                date_bounds(self.date)
+            except ValueError as e:
+                out.append(str(e))
+        if self.outcome is not None and self.outcome not in OUTCOMES:
+            out.append(f"unknown outcome '{self.outcome}'; allowed {list(OUTCOMES)}")
+        whole = {}
+        for name in ("finish", "field_size"):
+            v = getattr(self, name)
+            if v is None:
+                continue
+            if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+                out.append(f"{name} must be a whole number of at least 1")
+            else:
+                whole[name] = v
+        d = self.distance_m
+        if d is not None and (isinstance(d, bool) or not isinstance(d, (int, float)) or d <= 0):
+            out.append("distance_m must be a positive number")
+        if "finish" in whole and "field_size" in whole and whole["finish"] > whole["field_size"]:
+            out.append(f"finish {self.finish} is outside a field of {self.field_size}")
+        if self.outcome == "disqualified" and self.finish == 1:
+            out.append("a disqualified horse cannot have an official finish of 1; "
+                       "record the placing after the stewards' decision")
+        if self.outcome == "walkover" and self.finish not in (None, 1):
+            out.append("a walkover must have finish 1 or no finish")
+        if self.outcome in NON_FINISH_OUTCOMES and self.finish is not None:
+            out.append(f"outcome '{self.outcome}' means the horse did not finish, so finish must be empty")
+        return out
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "Race":
+        if isinstance(data, Race):
+            return data
+        if not isinstance(data, dict):
+            raise ValueError(f"Each race must be an object, got {type(data).__name__}")
+        unknown = set(data) - {f.name for f in fields(cls)}
+        if unknown:
+            raise ValueError(f"Unknown race fields {sorted(unknown)} in race '{data.get('race', '?')}'")
+        return cls(**data)
 
 
 @dataclass
@@ -69,6 +197,7 @@ class Horse:
     international: Optional[bool] = None
 
     results: Optional[List[str]] = None
+    races: Optional[List[Race]] = None
     summary: CareerSummary = field(default_factory=CareerSummary)
 
     complete_fields: List[str] = field(default_factory=list)
@@ -84,6 +213,10 @@ class Horse:
             self.raced_countries = [normalize_country(c) for c in self.raced_countries]
         if self.results is not None:
             self.results = [str(r).strip().upper() for r in self.results]
+        if self.races is not None:
+            if not isinstance(self.races, list):
+                raise ValueError(f"Invalid horse '{self.name}': races must be a list")
+            self.races = [Race.from_dict(r) for r in self.races]
         if not self.id:
             self.id = make_horse_id(self.name, self.country, self.foaled)
         self.validate()
@@ -124,15 +257,81 @@ class Horse:
             if s.wins is not None and s.wins != seq_wins:
                 problems.append(f"summary.wins={s.wins} but complete results list has {seq_wins} wins")
 
+        if self.races is not None:
+            problems.extend(self._race_problems())
+
         if problems:
             raise ValueError(f"Invalid horse '{self.name}': " + "; ".join(problems))
+
+    def _race_problems(self) -> List[str]:
+        problems = []
+        latest_start = None  # latest first-possible day among the races so far
+        for i, r in enumerate(self.races, start=1):
+            own = r.problems()
+            problems.extend(f"{r.describe(i)}: {p}" for p in own)
+            if r.date is None or any(p.startswith("date") for p in own):
+                continue
+            first, last = date_bounds(r.date)
+            if latest_start is not None and last < latest_start:
+                problems.append(f"{r.describe(i)} is dated before an earlier race; races must be in career order")
+            latest_start = first if latest_start is None else max(latest_start, first)
+
+        codes = [r.result_code for r in self.races]
+        if self.results is not None:
+            if len(self.results) != len(self.races):
+                problems.append(f"results has {len(self.results)} entries but races has {len(self.races)}")
+            else:
+                for i, (code, derived) in enumerate(zip(self.results, codes), start=1):
+                    if derived is not None and derived != code:
+                        problems.append(f"{self.races[i - 1].describe(i)}: results says {code} "
+                                        f"but the race record gives {derived}")
+
+        s = self.summary
+        complete = self.is_complete("races")
+        n, unknown = len(codes), codes.count(None)
+        known_wins = sum(c in WIN_CODES for c in codes)
+        if s.starts is not None and (s.starts != n if complete else s.starts < n):
+            listed = "the complete race list has" if complete else "the race list already has"
+            problems.append(f"summary.starts={s.starts} but {listed} {n} races")
+        if s.wins is not None and (s.wins < known_wins or (complete and s.wins > known_wins + unknown)):
+            extra = f" and {unknown} with unknown results" if unknown else ""
+            problems.append(f"summary.wins={s.wins} but the race list shows {known_wins} wins{extra}")
+
+        race_countries = set(self.race_countries())
+        if self.raced_countries is not None and self.is_complete("raced_countries"):
+            missing = sorted(race_countries - set(self.raced_countries))
+            if missing:
+                problems.append(f"races include {missing}, which the complete raced_countries list does not")
+        if self.international is False and self.country and race_countries - {self.country}:
+            problems.append("international is false but the race list includes a race abroad")
+        return problems
 
     # ------------------------------------------------------------------
     def is_complete(self, field_name: str) -> bool:
         return field_name in self.complete_fields
 
     def source_for(self, field_name: str) -> Optional[str]:
-        return self.sources.get(field_name) or self.sources.get("*")
+        own = self.sources.get(field_name)
+        if own:
+            return own
+        if field_name == "races" and self.races:
+            per_race = list(dict.fromkeys(r.source for r in self.races if r.source))
+            if per_race:
+                return "; ".join(per_race)
+        return self.sources.get("*")
+
+    def derived_results(self) -> Optional[List[str]]:
+        """W/DH/L codes from races, or None if races is unrecorded or any race's result is unknown."""
+        if self.races is None:
+            return None
+        codes = [r.result_code for r in self.races]
+        return None if None in codes else codes
+
+    def race_countries(self) -> Optional[List[str]]:
+        """Distinct countries in the race records, in order of first appearance."""
+        if self.races is None:
+            return None
+        return list(dict.fromkeys(r.country for r in self.races if r.country))
 
     @property
     def label(self) -> str:

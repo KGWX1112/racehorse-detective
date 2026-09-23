@@ -112,17 +112,61 @@ def streak_then_loss(results: List[str], min_len: int) -> bool:
     return False
 
 
+def result_sequence(h: Horse) -> Tuple[Optional[List[str]], bool, List[str]]:
+    """
+    The W/DH/L sequence, whether it covers the whole career, and the fields it
+    came from. An explicit results list comes first; otherwise the codes are
+    derived from races, which needs every race's result to be known. Validation
+    keeps results and races the same length when both exist, so either one
+    marked complete makes the sequence complete.
+    """
+    used = [f for f in ("results", "races") if getattr(h, f) is not None]
+    complete = any(h.is_complete(f) for f in used)
+    seq = h.results if h.results is not None else h.derived_results()
+    return seq, complete, used
+
+
+def recorded_losses(h: Horse) -> List[str]:
+    """Fields that show at least one loss, even in a partial record."""
+    out = []
+    if h.results is not None and "L" in h.results:
+        out.append("results")
+    if h.races is not None and any(r.result_code == "L" for r in h.races):
+        out.append("races")
+    return out
+
+
 def known_counts(h: Horse) -> Tuple[Optional[int], Optional[int], List[str]]:
-    """Career starts and wins from the summary, or from a complete race list."""
+    """Career starts and wins from the summary, or from a complete results or race list."""
     starts, wins = h.summary.starts, h.summary.wins
     used = ["summary"] if (starts is not None or wins is not None) else []
-    if h.results is not None and h.is_complete("results"):
+    seq, complete, seq_fields = result_sequence(h)
+    if complete:
         if starts is None:
-            starts = len(h.results)
-        if wins is None:
-            wins = sum(r in WIN_CODES for r in h.results)
-        used.append("results")
+            starts = len(seq) if seq is not None else len(h.races)
+        if wins is None and seq is not None:
+            wins = sum(r in WIN_CODES for r in seq)
+        used.extend(seq_fields)
     return starts, wins, used
+
+
+def known_raced_countries(h: Horse) -> Tuple[Optional[List[str]], bool, List[str]]:
+    """
+    Countries the horse raced in, whether that list is the full record, and the
+    fields used. Race records add to raced_countries, so a race abroad in a
+    partial list still shows the horse raced abroad. Race records alone are
+    complete only when the race list is complete and every race has a country.
+    """
+    listed, from_races = h.raced_countries, h.race_countries()
+    if listed is None and from_races is None:
+        return None, False, []
+    countries = list(dict.fromkeys((listed or []) + (from_races or [])))
+    used = (["raced_countries"] if listed is not None else []) + (["races"] if from_races else [])
+    if listed is not None:
+        complete = h.is_complete("raced_countries")
+    else:
+        complete = h.is_complete("races") and all(r.country for r in h.races)
+    return countries, complete, used
 
 
 # ============================================================
@@ -133,13 +177,14 @@ def known_counts(h: Horse) -> Tuple[Optional[int], Optional[int], List[str]]:
 def eval_win_streak(h: Horse, p: Dict[str, Any]) -> Finding:
     """Won at least `min` races in a row."""
     need = int(p["min"])
+    seq, complete, seq_fields = result_sequence(h)
     longest = None
-    if h.results is not None:
-        longest = longest_win_streak(h.results)
+    if seq is not None:
+        longest = longest_win_streak(seq)
         if longest >= need:
-            return Finding(M, f"Longest recorded winning streak is {longest}.", ["results"])
-        if h.is_complete("results"):
-            return Finding(X, f"Complete race record; longest winning streak is {longest}.", ["results"])
+            return Finding(M, f"Longest recorded winning streak is {longest}.", seq_fields)
+        if complete:
+            return Finding(X, f"Complete race record; longest winning streak is {longest}.", seq_fields)
 
     starts, wins, used = known_counts(h)
     if wins is not None and wins < need:
@@ -149,7 +194,7 @@ def eval_win_streak(h: Horse, p: Dict[str, Any]) -> Finding:
     if starts is not None and wins is not None and starts == wins:
         return Finding(M, f"Unbeaten in {starts} starts, so the streak is {starts}.", used)
     if longest is not None:
-        return Finding(U, f"Partial race record shows a best streak of {longest}; the rest of the career is not recorded.", ["results"] + used)
+        return Finding(U, f"Partial race record shows a best streak of {longest}; the rest of the career is not recorded.", seq_fields + used)
     return Finding(U, "No race sequence recorded, and the career summary does not settle the streak length.", used)
 
 
@@ -157,11 +202,12 @@ def eval_win_streak(h: Horse, p: Dict[str, Any]) -> Finding:
 def eval_loss_after_streak(h: Horse, p: Dict[str, Any]) -> Finding:
     """Lost the race directly after a run of at least `min` wins."""
     need = int(p["min"])
-    if h.results is not None:
-        if streak_then_loss(h.results, need):
-            return Finding(M, f"A run of {need}+ wins ends directly in a loss.", ["results"])
-        if h.is_complete("results"):
-            return Finding(X, f"Complete race record has no run of {need}+ wins ending in a loss.", ["results"])
+    seq, complete, seq_fields = result_sequence(h)
+    if seq is not None:
+        if streak_then_loss(seq, need):
+            return Finding(M, f"A run of {need}+ wins ends directly in a loss.", seq_fields)
+        if complete:
+            return Finding(X, f"Complete race record has no run of {need}+ wins ending in a loss.", seq_fields)
 
     starts, wins, used = known_counts(h)
     if starts is not None and wins is not None and starts == wins:
@@ -177,8 +223,9 @@ def eval_loss_after_streak(h: Horse, p: Dict[str, Any]) -> Finding:
 def eval_unbeaten(h: Horse, p: Dict[str, Any]) -> Finding:
     """Never lost. Optional `min_starts` sets a minimum career length."""
     min_starts = int(p.get("min_starts", 1))
-    if h.results is not None and "L" in h.results:
-        return Finding(X, "Race record includes a loss.", ["results"])
+    lost_in = recorded_losses(h)
+    if lost_in:
+        return Finding(X, "Race record includes a loss.", lost_in)
     starts, wins, used = known_counts(h)
     if starts is not None and wins is not None:
         if wins < starts:
@@ -222,23 +269,27 @@ def eval_international(h: Horse, p: Dict[str, Any]) -> Finding:
     want = bool(p.get("value", True))
     raced_abroad = None
     used = []
-    if h.raced_countries is not None and h.country:
-        abroad = [c for c in h.raced_countries if c != h.country]
-        used = ["raced_countries", "country"]
+    countries, complete, country_fields = known_raced_countries(h)
+    if country_fields and h.country:
+        abroad = [c for c in countries if c != h.country]
+        used = country_fields + ["country"]
         if abroad:
             raced_abroad, detail = True, f"Raced in {', '.join(abroad)} (foaled in {h.country})."
-        elif h.is_complete("raced_countries"):
+        elif complete:
             raced_abroad, detail = False, f"Complete list shows racing only in {h.country}."
     if raced_abroad is None and h.international is not None:
         raced_abroad, used = h.international, ["international"]
         detail = "Recorded as having raced abroad." if raced_abroad else "Recorded as never having raced abroad."
     if raced_abroad is None:
         if used:
+            if h.raced_countries is None and h.is_complete("races"):
+                return Finding(U, f"Every race with a recorded country was in {h.country}, "
+                                  f"but some races have no country.", used)
             return Finding(U, f"Recorded races are all in {h.country}, but the list is not marked complete.", used)
-        if h.raced_countries is not None:
-            listed = ", ".join(h.raced_countries) or "none listed"
+        if country_fields:
+            listed = ", ".join(countries) or "none listed"
             return Finding(U, f"Country of foaling is unknown, so the raced countries ({listed}) "
-                              f"cannot be compared with it.", ["raced_countries"])
+                              f"cannot be compared with it.", country_fields)
         return Finding(U, "No record of where the horse raced.", used)
     return Finding(M if raced_abroad == want else X, detail, used)
 

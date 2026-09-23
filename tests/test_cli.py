@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import json
 import os
 import subprocess
 import sys
@@ -71,6 +72,43 @@ class SetCompleteWarningTest(CliTestCase):
     def test_no_warning_for_source_only(self):
         _, err = run_cli("--db", self.db, "set", self.HORSE_ID, "results", "--source", "Test source")
         self.assertEqual(err, "")
+
+
+class RacesCliTest(CliTestCase):
+    HORSE_ID = "test-runner-gb-2000"
+
+    def setUp(self):
+        super().setUp()
+        with HorseStore(self.db) as store:
+            store.upsert(Horse(name="Test Runner", country="GB", foaled=2000,
+                               races=[{"finish": 1}, {"finish": 2}]))
+
+    def test_value_is_refused(self):
+        with self.assertRaises(SystemExit) as cm:
+            run_cli("--db", self.db, "set", self.HORSE_ID, "races", "[]")
+        self.assertIn("use 'import'", str(cm.exception.code))
+
+    def test_mark_complete(self):
+        run_cli("--db", self.db, "set", self.HORSE_ID, "races", "--complete")
+        with HorseStore(self.db) as store:
+            self.assertTrue(store.get(self.HORSE_ID).is_complete("races"))
+
+    def test_list_counts_race_records(self):
+        out, _ = run_cli("--db", self.db, "list")
+        self.assertIn("2 race records", out)
+
+
+class ExportImportTest(CliTestCase):
+    def test_seed_data_round_trips(self):
+        tmp = os.path.dirname(self.db)
+        first, second = os.path.join(tmp, "first.json"), os.path.join(tmp, "second.json")
+        run_cli("--db", self.db, "import", os.path.join(REPO_ROOT, "data", "seed_horses.json"))
+        run_cli("--db", self.db, "export", first)
+        other_db = os.path.join(tmp, "other.db")
+        run_cli("--db", other_db, "import", first)
+        run_cli("--db", other_db, "export", second)
+        with open(first, encoding="utf-8") as a, open(second, encoding="utf-8") as b:
+            self.assertEqual(json.load(a), json.load(b))
 
 
 class BrokenPipeTest(CliTestCase):

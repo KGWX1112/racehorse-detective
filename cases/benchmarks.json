@@ -83,6 +83,36 @@
         {"description": "Foaled in Australia", "type": "country", "params": {"code": "AUS"}, "hard": true}
       ],
       "expected": {"verdict": "LEADING", "answer": "golden-arrow-aus-1999"}
+    },
+    {
+      "name": "race-records-derived-career",
+      "notes": "Copper Wren has only race records. Its five-race streak counts a walkover and a dead heat for first as wins, and ends when it is disqualified from first. Starts, wins, and racing abroad come from the complete race list.",
+      "clues": [
+        {"description": "Won five in a row", "type": "win_streak", "params": {"min": 5}, "hard": true},
+        {"description": "Lost directly after the five-race streak", "type": "loss_after_streak", "params": {"min": 5}, "hard": true},
+        {"description": "Seven career wins", "type": "career", "params": {"field": "wins", "op": "eq", "n": 7}, "hard": true},
+        {"description": "Ten career starts", "type": "career", "params": {"field": "starts", "op": "eq", "n": 10}, "hard": true},
+        {"description": "Raced outside its home country", "type": "international", "params": {"value": true}, "weight": 5}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "copper-wren-gb-1984"}
+    },
+    {
+      "name": "partial-race-list-abroad",
+      "notes": "Juniper Vale's race list is partial, but one listed race in GB shows that it raced abroad.",
+      "clues": [
+        {"description": "Foaled in the 1960s", "type": "foaled", "params": {"min": 1960, "max": 1969}, "hard": true},
+        {"description": "Raced outside its home country", "type": "international", "params": {"value": true}, "weight": 5}
+      ],
+      "expected": {"verdict": "SOLVED", "answer": "juniper-vale-fr-1966"}
+    },
+    {
+      "name": "partial-race-list-streak-unknown",
+      "notes": "Juniper Vale's partial race list has no two wins in a row. The list is not complete, so the streak stays unknown and the hard clue does not eliminate it.",
+      "clues": [
+        {"description": "Foaled in the 1960s", "type": "foaled", "params": {"min": 1960, "max": 1969}, "hard": true},
+        {"description": "Won at least two in a row", "type": "win_streak", "params": {"min": 2}, "hard": true}
+      ],
+      "expected": {"verdict": "LEADING", "answer": "juniper-vale-fr-1966"}
     }
   ]
 }

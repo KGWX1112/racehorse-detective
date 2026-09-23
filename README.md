@@ -45,13 +45,41 @@ A field listed in `complete_fields` is the horse's full record for that field. O
 
 Race results use three codes, in career order: `W` for a win, `DH` for a dead heat for first (counted as a win), and `L` for any other finish. `D` is rejected because it is ambiguous.
 
-Career starts and wins come from `summary`, or are counted from `results` when the results list is complete. The two must agree if both are present.
+Career starts and wins come from `summary`, or are counted from `results` or `races` when that list is complete. The summary and the lists must agree when both are present.
 
-International status comes from `raced_countries` compared with `country` when available, and from the `international` flag otherwise.
+International status comes from `raced_countries` and the countries in `races`, compared with `country`, when available, and from the `international` flag otherwise.
 
 `sources` maps a field name to a citation. `"*"` is the fallback for fields without their own entry, and all summary counts share the key `"summary"`. The report prints the source next to each piece of evidence.
 
 Ids are built from name, country suffix, and foaling year, e.g. `silver-comet-jpn-2001`. The id does not change if you later edit those fields.
+
+## Race records
+
+`races` lists a horse's starts in career order. Each race is an object, and every field is optional.
+
+| Field | Meaning |
+|---|---|
+| `date` | ISO 8601. Partial dates are allowed: `"1875"`, `"1875-06"`, `"1875-06-12"` |
+| `race` | Race name as published |
+| `venue` | Racecourse |
+| `country` | Country of the race, stored as a suffix code |
+| `grade` | Grade as published, e.g. `"G1"`, `"Grade 1"`, `"Listed"` |
+| `distance_m` | Distance in metres |
+| `distance_text` | Distance as published, e.g. `"1m 2f"` |
+| `surface` | Racing surface |
+| `finish` | Official finishing position; 1 means won |
+| `outcome` | `finished`, `dead_heat`, `walkover`, `disqualified`, `promoted`, `fell`, `pulled_up`, `unseated`, `refused`, `brought_down`, `ran_out`, or `did_not_finish` |
+| `field_size`, `jockey`, `trainer`, `notes`, `source` | As named |
+
+Each race gets a W, DH, or L code from its official result. A dead heat for first is `DH`. A walkover counts as a win and as a start. A horse disqualified from first counts as a loss, and a horse promoted to first counts as a win. Any outcome where the horse did not finish is a loss. A race with no finish and no deciding outcome has an unknown result.
+
+Race records cannot be entered with `set`. Put them in a JSON file and use `import`. Mark the list complete with `set ID races --complete`.
+
+Validation rejects races whose dates go backwards. A partial date conflicts with another date only when their ranges cannot overlap, so `"1875"` may follow `"1875-06-12"`. When a horse has both `results` and `races`, the two must have the same length, and every known race result must match its code in `results`. A complete race list must match `summary.starts`, and a partial list cannot show more races or wins than the summary.
+
+When `results` is absent, the streak, unbeaten, and career clues use the codes derived from `races`. Starts and wins are counted only from a complete race list. A race abroad shows that the horse raced internationally even when the race list is partial.
+
+Grades compare through a normalized form, so "G1", "Group 1", "Grade 1", and "Grade I" are equal. The published text is kept.
 
 ## How cases are scored
 
@@ -82,15 +110,15 @@ Text clues match whole words after lowercasing and stripping punctuation, so "Mo
 
 ## Benchmark
 
-`cases/benchmarks.json` has nine cases against the six seed horses. They cover the prototype case in soft and hard form (both end in a tie, because Crimson Monarch's longest streak is six), elimination by title and date, inference from a summary-only career, a sparse-data horse that stays unresolved, a no-match case, counts derived from a complete race list, international status derived from venues, and word-boundary matching.
+`cases/benchmarks.json` has twelve cases against the eight seed horses. The first nine come from V0.1. They cover the prototype case in soft and hard form (both end in a tie, because Crimson Monarch's longest streak is six), elimination by title and date, inference from a summary-only career, a sparse-data horse that stays unresolved, a no-match case, counts derived from a complete race list, international status derived from venues, and word-boundary matching. The other three cover race records: a career derived from a complete race list, racing abroad shown by a partial race list, and a streak that stays unknown on a partial race list.
 
-All six seed horses are fictional. Old Tempest and Harbor Lantern were added to test horses with a career summary and no race order.
+All eight seed horses are fictional. Old Tempest and Harbor Lantern were added to test horses with a career summary and no race order. Copper Wren has a complete race list that includes a walkover, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first. Juniper Vale has a career summary and a partial race list.
 
 Run the benchmark after every change. Add a case each time you find a behavior you want to keep.
 
 ## Unit tests
 
-`tests/` holds `unittest` tests for the career and text helpers, the `international` evaluator, and command-line behavior that the benchmark cannot check. Run them from the repository root with `python -m unittest`. They need no network access.
+`tests/` holds `unittest` tests for the career and text helpers, race records, the evaluators, and command-line behavior that the benchmark cannot check. Run them from the repository root with `python -m unittest`. They need no network access.
 
 ## Adding a clue type
 
@@ -98,7 +126,11 @@ Write a function in `horsedetective/evaluators.py` that takes a horse and the cl
 
 ## Known limits
 
-Results carry no race metadata (date, race, grade, venue, distance), so clues about when or where something happened are not possible yet. That is the V0.2 schema change.
+Race records store dates, venues, grades, and distances, but no clue type reads those fields yet. The evaluators see only the codes, counts, and countries derived from them.
+
+If any race in a list has an unknown result, the derived code sequence as a whole is unknown. Streak clues then return unknown for that horse, even when the known races would settle them.
+
+Grade matching knows the G, Group, Grade, and Listed forms. Other published grades, such as Japan's Jpn1, compare as plain text.
 
 Title matching has no aliases, so a race that was renamed or sponsored under different names needs each name entered. Synonyms are V0.3.
 

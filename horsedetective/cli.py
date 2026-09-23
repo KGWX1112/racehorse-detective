@@ -7,6 +7,7 @@ Command-line interface.
   python -m horsedetective add
   python -m horsedetective set silver-comet-jpn-2001 trainers "M. Hale" --source "Racing annual, 2005"
   python -m horsedetective set silver-comet-jpn-2001 results --complete
+  python -m horsedetective set copper-wren-gb-1984 races --complete
   python -m horsedetective solve cases/original_sample.json
   python -m horsedetective bench cases/benchmarks.json
   python -m horsedetective clues
@@ -26,7 +27,7 @@ from .report import render
 from .store import HorseStore
 
 STR_FIELDS = ("name", "country", "sex", "notes")
-SETTABLE = STR_FIELDS + ("foaled", "international", "results") + LIST_FIELDS + SUMMARY_FIELDS
+SETTABLE = STR_FIELDS + ("foaled", "international", "results", "races") + LIST_FIELDS + SUMMARY_FIELDS
 
 
 # ============================================================
@@ -117,7 +118,11 @@ def cmd_list(store: HorseStore, args) -> None:
     for h in horses:
         s = h.summary
         record = f"{s.starts}-{s.wins}" if s.starts is not None and s.wins is not None else ""
-        seq = f"{len(h.results)} races{' (complete)' if h.is_complete('results') else ''}" if h.results else ""
+        seq = ""
+        if h.races:
+            seq = f"{len(h.races)} race records{' (complete)' if h.is_complete('races') else ''}"
+        elif h.results:
+            seq = f"{len(h.results)} races{' (complete)' if h.is_complete('results') else ''}"
         print(f"{h.id:<34} {h.label:<34} {record:<8} {seq}")
 
 
@@ -184,6 +189,8 @@ def cmd_set(store: HorseStore, args) -> None:
     field = args.field.removeprefix("summary.")
     if field not in SETTABLE:
         raise SystemExit(f"Cannot set '{args.field}'. Settable fields: {', '.join(SETTABLE)}")
+    if field == "races" and args.value is not None and not args.clear:
+        raise SystemExit("Race records cannot be set from the command line. Add them to a JSON file and use 'import'.")
     horse = _require_horse(store, args.id)
     d = horse.to_dict()
 

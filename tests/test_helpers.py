@@ -3,7 +3,7 @@
 import unittest
 
 from horsedetective.evaluators import longest_win_streak, streak_then_loss
-from horsedetective.text import normalize_country, text_matches
+from horsedetective.text import normalize_country, normalize_grade, text_matches
 
 W, DH, L = "W", "DH", "L"
 
@@ -97,6 +97,26 @@ class NormalizeCountryTest(unittest.TestCase):
 
     def test_unlisted_value_is_stripped_and_uppercased(self):
         self.assertEqual(normalize_country(" arg "), "ARG")
+
+
+class NormalizeGradeTest(unittest.TestCase):
+    def test_group_and_grade_forms_are_equal(self):
+        for raw in ("G1", "Group 1", "Grade 1", "Gr. 1", "Grade I", "group one"):
+            with self.subTest(raw=raw):
+                self.assertEqual(normalize_grade(raw), "G1")
+
+    def test_levels_stay_distinct(self):
+        self.assertEqual(normalize_grade("Grade III"), "G3")
+        self.assertNotEqual(normalize_grade("G1"), normalize_grade("G2"))
+
+    def test_listed(self):
+        for raw in ("Listed", "LR"):
+            with self.subTest(raw=raw):
+                self.assertEqual(normalize_grade(raw), "LISTED")
+
+    def test_other_text_is_normalized(self):
+        self.assertEqual(normalize_grade("Handicap"), normalize_grade(" handicap "))
+        self.assertEqual(normalize_grade("Grade 1 Stakes"), "grade 1 stakes")
 
 
 if __name__ == "__main__":
