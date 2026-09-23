@@ -4,6 +4,7 @@ Command-line interface.
   python -m horsedetective import data/seed_horses.json
   python -m horsedetective list
   python -m horsedetective show silver-comet-jpn-2001
+  python -m horsedetective timeline copper-wren-gb-1984
   python -m horsedetective add
   python -m horsedetective set silver-comet-jpn-2001 trainers "M. Hale" --source "Racing annual, 2005"
   python -m horsedetective set silver-comet-jpn-2001 results --complete
@@ -23,7 +24,7 @@ from typing import Any, Dict, List, Optional
 from .engine import Case, investigate
 from .evaluators import EVALUATORS
 from .models import COMPLETABLE_FIELDS, LIST_FIELDS, SUMMARY_FIELDS, Horse, make_horse_id
-from .report import render
+from .report import render, render_timeline
 from .store import HorseStore
 
 STR_FIELDS = ("name", "country", "sex", "notes")
@@ -128,6 +129,10 @@ def cmd_list(store: HorseStore, args) -> None:
 
 def cmd_show(store: HorseStore, args) -> None:
     print(json.dumps(_require_horse(store, args.id).to_dict(), indent=2, ensure_ascii=False))
+
+
+def cmd_timeline(store: HorseStore, args) -> None:
+    print(render_timeline(_require_horse(store, args.id)))
 
 
 def cmd_add(store: HorseStore, args) -> None:
@@ -311,6 +316,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("show", help="Print one horse as JSON")
     s.add_argument("id")
     s.set_defaults(func=cmd_show)
+
+    s = sub.add_parser("timeline", help="Print one horse's races in order with age and win streak")
+    s.add_argument("id")
+    s.set_defaults(func=cmd_timeline)
 
     s = sub.add_parser("add", help="Add a horse interactively")
     s.set_defaults(func=cmd_add)

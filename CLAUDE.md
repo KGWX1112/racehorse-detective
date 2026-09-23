@@ -22,7 +22,8 @@ Python 3.9 or later. The core package uses only the standard library. Any new de
 | `horsedetective/models.py` | `Horse`, `CareerSummary`, validation, id generation |
 | `horsedetective/evaluators.py` | `Clue`, `Finding`, `Status`, the `@evaluator` registry, all clue types |
 | `horsedetective/engine.py` | Elimination, scoring, ranking, verdicts |
-| `horsedetective/report.py` | Plain-text case report |
+| `horsedetective/report.py` | Plain-text case report and timeline |
+| `horsedetective/dates.py` | Partial dates, the racing-age table, `RacingAge` |
 | `horsedetective/store.py` | SQLite storage (validated JSON per row) |
 | `horsedetective/text.py` | Normalization, whole-word matching, country suffixes |
 | `horsedetective/cli.py` | argparse commands |

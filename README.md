@@ -22,6 +22,7 @@ The database defaults to `horses.db` in the current directory. Use `--db path` t
 | `export FILE` | Write the whole database to JSON |
 | `list [TEXT]` | List horses, optionally filtered by name or id |
 | `show ID` | Print one horse as JSON |
+| `timeline ID` | Print one horse's races in order with age, finish, and running win streak |
 | `add` | Add a horse through prompts |
 | `set ID FIELD [VALUE]` | Edit one field; accepts `--source`, `--complete`, `--incomplete`, `--clear` |
 | `delete ID` | Remove a horse |
@@ -81,6 +82,16 @@ When `results` is absent, the streak, unbeaten, and career clues use the codes d
 
 Grades compare through a normalized form, so "G1", "Group 1", "Grade 1", "Grade I", and Japan's domestic "Jpn1" are equal. The published text is kept.
 
+## Timelines and racing age
+
+`timeline ID` prints one line per race record: date, age, race, venue with country, grade, finish, and the running win streak. The streak counts a walkover as a win and passes over a void race. On a partial race list it counts only the recorded races, and after a race with an unknown result it shows a lower bound such as `2+`. A horse with only `results` gets its W/DH/L sequence and streak without dates. The output ends with the source of the records.
+
+A racing age counts official birthdays. Horses foaled in GB, IRE, FR, USA, CAN, JPN, GER, or HUN age on 1 January, and horses foaled in AUS or NZ age on 1 August. A horse is treated as born on that day of its foaling year. The table is `RACING_BIRTHDAYS` in `horsedetective/dates.py`, and a country gets an entry only after the owner confirms its date.
+
+Each race has two ages: one under the birthday of the country of foaling and one under the birthday of the country of the race. They differ only when the two countries use different birthdays and the race falls between them. The timeline prints the first age and adds the second after a slash when it differs. A horse foaled in AUS in 2000 that races in GB in March 2003 shows `2/3`.
+
+An age is unknown when the foaling year or race date is missing, when the country is not in the table, or when a partial date spans the birthday. A year-only date for an AUS horse is an example of the last case.
+
 ## How cases are scored
 
 Each clue is hard or soft and has a weight (default 10).
@@ -131,6 +142,8 @@ Race records store dates, venues, grades, and distances, but no clue type reads 
 If any race in a list has an unknown result, the derived code sequence as a whole is unknown. Streak clues then return unknown for that horse, even when the known races would settle them.
 
 Grade matching knows the G, Group, Grade, Jpn, and Listed forms. Other published grades compare as plain text.
+
+No clue type reads racing ages yet. Validation rejects a race dated before the foaling year, but nothing checks whether an age is plausible for racing.
 
 Title matching has no aliases, so a race that was renamed or sponsored under different names needs each name entered. Synonyms are V0.3.
 

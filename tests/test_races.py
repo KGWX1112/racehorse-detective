@@ -4,9 +4,8 @@ import json
 import os
 import tempfile
 import unittest
-from datetime import date
 
-from horsedetective.models import Horse, Race, date_bounds
+from horsedetective.models import Horse, Race
 from horsedetective.store import HorseStore
 
 
@@ -62,17 +61,6 @@ class ResultCodeTest(unittest.TestCase):
 
     def test_country_is_normalized(self):
         self.assertEqual(Race(country="France").country, "FR")
-
-
-class DateBoundsTest(unittest.TestCase):
-    def test_year(self):
-        self.assertEqual(date_bounds("1875"), (date(1875, 1, 1), date(1875, 12, 31)))
-
-    def test_month_in_leap_year(self):
-        self.assertEqual(date_bounds("1876-02"), (date(1876, 2, 1), date(1876, 2, 29)))
-
-    def test_day(self):
-        self.assertEqual(date_bounds("1875-06-12"), (date(1875, 6, 12), date(1875, 6, 12)))
 
 
 class RaceValidationTest(unittest.TestCase):
@@ -139,6 +127,12 @@ class CareerOrderTest(unittest.TestCase):
 
     def test_undated_races_are_skipped(self):
         horse(races=[{"date": "1876"}, {}, {"date": "1876-05"}])
+
+    def test_race_before_foaling_year_rejected(self):
+        with self.assertRaises(ValueError) as cm:
+            horse(foaled=1875, races=[{"date": "1874-12"}])
+        self.assertIn("before the foaling year 1875", str(cm.exception))
+        horse(foaled=1875, races=[{"date": "1875"}])
 
 
 class RacesAndOtherFieldsTest(unittest.TestCase):

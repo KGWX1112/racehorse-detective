@@ -111,6 +111,69 @@ class ExportImportTest(CliTestCase):
             self.assertEqual(json.load(a), json.load(b))
 
 
+class TimelineTest(CliTestCase):
+    def setUp(self):
+        super().setUp()
+        run_cli("--db", self.db, "import", os.path.join(REPO_ROOT, "data", "seed_horses.json"))
+
+    def timeline(self, horse_id):
+        out, _ = run_cli("--db", self.db, "timeline", horse_id)
+        return out
+
+    def row(self, out, number):
+        lines = out.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.split()[:1] == ["#"])
+        return next(line.split() for line in lines[start + 1:] if line.split()[:1] == [str(number)])
+
+    def test_race_records(self):
+        out = self.timeline("copper-wren-gb-1984")
+        self.assertIn("11 race records, marked complete.", out)
+        self.assertIn("GB official birthday, 1 January", out)
+        # date, age, and running streak through the walkover, void race, and disqualification
+        self.assertEqual(self.row(out, 3)[:3] + self.row(out, 3)[-2:], ["3", "1986-08", "2", "walkover", "2"])
+        self.assertEqual(self.row(out, 5)[-2:], ["void", "3"])
+        self.assertEqual(self.row(out, 7)[-1], "5")
+        self.assertIn("2nd of 10 (disqualified)", out)
+        self.assertEqual(self.row(out, 8)[-1], "0")
+        self.assertEqual(self.row(out, 11)[2], "4")
+        self.assertIn("sources: races: V0.2 test data (fictional)", out)
+
+    def test_partial_list_is_flagged(self):
+        out = self.timeline("juniper-vale-fr-1966")
+        self.assertIn("not marked complete", out)
+        self.assertIn("counts only the recorded races", out)
+
+    def test_results_only(self):
+        out = self.timeline("silver-comet-jpn-2001")
+        self.assertIn("no dates or race details", out)
+        self.assertEqual(self.row(out, 7), ["7", "W", "7"])
+        self.assertEqual(self.row(out, 8), ["8", "L", "0"])
+
+    def test_no_sequence(self):
+        out = self.timeline("old-tempest-gb-1871")
+        self.assertIn("Career summary: 30 starts, 30 wins.", out)
+        self.assertIn("No race records or results recorded.", out)
+
+    def test_unknown_result_makes_streak_a_lower_bound(self):
+        with HorseStore(self.db) as store:
+            store.upsert(Horse(name="Test Runner", country="AUS", foaled=2000, races=[
+                {"date": "2002-09", "country": "AUS", "finish": 1},
+                {"date": "2003-03-01", "country": "GB", "finish": 1},
+                {"date": "2003-06", "country": "AUS"},
+                {"date": "2003-10", "country": "AUS", "finish": 1},
+            ]))
+        out = self.timeline("test-runner-aus-2000")
+        self.assertEqual(self.row(out, 2)[2], "2/3")
+        self.assertEqual(self.row(out, 3)[-2:], ["?", "?"])
+        self.assertEqual(self.row(out, 4)[-1], "1+")
+
+    def test_results_fill_unknown_race_results(self):
+        with HorseStore(self.db) as store:
+            store.upsert(Horse(name="Test Runner", country="GB", foaled=2000, results=["W", "W"],
+                               races=[{"finish": 1}, {"race": "Result not in the race record"}]))
+        self.assertEqual(self.row(self.timeline("test-runner-gb-2000"), 2)[-1], "2")
+
+
 class BrokenPipeTest(CliTestCase):
     def test_closed_reader_gives_no_traceback(self):
         # Closing the read end before the child writes makes its first flush

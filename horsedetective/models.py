@@ -16,12 +16,10 @@ Conventions that the evaluators rely on:
   and races are both recorded, validation requires them to agree.
 """
 
-import calendar
-import re
 from dataclasses import asdict, dataclass, field, fields
-from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
+from .dates import RacingAge, age_under, date_bounds
 from .text import normalize, normalize_country, normalize_grade, slugify
 
 RESULT_CODES = ("W", "DH", "L")
@@ -42,23 +40,6 @@ LIST_FIELDS = (
 COMPLETABLE_FIELDS = LIST_FIELDS + ("results", "races")
 SUMMARY_FIELDS = ("starts", "wins", "seconds", "thirds")
 
-_DATE_RE = re.compile(r"(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?")
-
-
-def date_bounds(text: str) -> Tuple[date, date]:
-    """First and last day a partial ISO 8601 date can mean. "1875" covers the whole year."""
-    m = _DATE_RE.fullmatch(str(text))
-    if not m:
-        raise ValueError(f"date '{text}' is not YYYY, YYYY-MM, or YYYY-MM-DD")
-    year, month, day = (int(g) if g else None for g in m.groups())
-    try:
-        if month is None:
-            return date(year, 1, 1), date(year, 12, 31)
-        if day is None:
-            return date(year, month, 1), date(year, month, calendar.monthrange(year, month)[1])
-        return date(year, month, day), date(year, month, day)
-    except ValueError:
-        raise ValueError(f"date '{text}' is not a calendar date") from None
 
 
 def make_horse_id(name: str, country: Optional[str], foaled: Optional[int]) -> str:
@@ -281,6 +262,8 @@ class Horse:
             if r.date is None or any(p.startswith("date") for p in own):
                 continue
             first, last = date_bounds(r.date)
+            if self.foaled is not None and last.year < self.foaled:
+                problems.append(f"{r.describe(i)} is dated before the foaling year {self.foaled}")
             if latest_start is not None and last < latest_start:
                 problems.append(f"{r.describe(i)} is dated before an earlier race; races must be in career order")
             latest_start = first if latest_start is None else max(latest_start, first)
@@ -343,6 +326,13 @@ class Horse:
             return None
         codes = [r.result_code for r in starts]
         return None if None in codes else codes
+
+    def age_at(self, race: Race) -> Optional[RacingAge]:
+        """Racing age on the race date, or None if the foaling year or the race date is unknown."""
+        if self.foaled is None or race.date is None:
+            return None
+        return RacingAge(age_under(self.foaled, self.country, race.date),
+                         age_under(self.foaled, race.country, race.date))
 
     def race_countries(self) -> Optional[List[str]]:
         """Distinct countries of the starts, in order of first appearance."""
