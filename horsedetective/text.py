@@ -51,14 +51,15 @@ _GRADE_NUMBERS = {
     "i": "1", "ii": "2", "iii": "3",
     "one": "1", "two": "2", "three": "3",
 }
-_GRADE_RE = re.compile(r"(?:g|gr|grade|group) ?(1|2|3|i{1,3}|one|two|three)")
+_GRADE_RE = re.compile(r"(?:g|gr|grade|group|jpn) ?(1|2|3|i{1,3}|one|two|three)")
 
 
 def normalize_grade(text: str) -> str:
     """
     Comparable form of a published grade. "G1", "Group 1", "Grade 1", "Gr. 1",
-    and "Grade I" all give "G1". "Listed", "LR", and "L" give "LISTED". Any
-    other text is normalized, so identical published grades still compare equal.
+    "Grade I", and Japan's domestic "Jpn1" all give "G1". "Listed", "LR", and
+    "L" give "LISTED". Any other text is normalized, so identical published
+    grades still compare equal.
     """
     t = normalize(text)
     m = _GRADE_RE.fullmatch(t)

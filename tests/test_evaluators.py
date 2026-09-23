@@ -90,6 +90,17 @@ class RaceRecordTest(unittest.TestCase):
         f = evaluate("international", Horse(name="Test Horse", country="GB", races=[{"finish": 1}]))
         self.assertEqual(f.explanation, "No record of where the horse raced.")
 
+    def test_void_race_is_skipped(self):
+        races = [{"finish": 1}, {"outcome": "void"}, {"finish": 1}, {"finish": 2}]
+        h = Horse(name="Test Horse", races=races, complete_fields=["races"])
+        self.assertEqual(evaluate("win_streak", h, min=2).status, Status.MATCH)
+        self.assertEqual(evaluate("loss_after_streak", h, min=2).status, Status.MATCH)
+        self.assertEqual(evaluate("career", h, field="starts", op="eq", n=3).status, Status.MATCH)
+
+    def test_complete_list_with_unknown_result_counts_starts_without_void(self):
+        h = Horse(name="Test Horse", races=[{"finish": 1}, {}, {"outcome": "void"}], complete_fields=["races"])
+        self.assertEqual(evaluate("career", h, field="starts", op="eq", n=2).status, Status.MATCH)
+
     def test_race_abroad_adds_to_partial_raced_countries(self):
         h = Horse(name="Test Horse", country="GB", raced_countries=["GB"], races=[{"country": "FR"}])
         self.assertEqual(evaluate("international", h).status, Status.MATCH)

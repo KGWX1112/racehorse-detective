@@ -105,6 +105,10 @@ class NormalizeGradeTest(unittest.TestCase):
             with self.subTest(raw=raw):
                 self.assertEqual(normalize_grade(raw), "G1")
 
+    def test_japanese_domestic_grades(self):
+        self.assertEqual(normalize_grade("Jpn1"), "G1")
+        self.assertEqual(normalize_grade("JPN 3"), "G3")
+
     def test_levels_stay_distinct(self):
         self.assertEqual(normalize_grade("Grade III"), "G3")
         self.assertNotEqual(normalize_grade("G1"), normalize_grade("G2"))

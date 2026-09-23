@@ -35,6 +35,7 @@ class ResultCodeTest(unittest.TestCase):
         (None, "promoted", None),
         (None, "fell", "L"),
         (None, "pulled_up", "L"),
+        (None, "void", None),
     ]
 
     def test_table(self):
@@ -49,6 +50,10 @@ class ResultCodeTest(unittest.TestCase):
     def test_walkover_flag(self):
         self.assertTrue(Race(outcome="walkover").is_walkover)
         self.assertFalse(Race(finish=1).is_walkover)
+
+    def test_void_race_is_not_a_start(self):
+        self.assertFalse(Race(outcome="void").counts_as_start)
+        self.assertTrue(Race(finish=5).counts_as_start)
 
     def test_grade_key_keeps_published_text(self):
         r = Race(grade="Group 1")
@@ -108,6 +113,9 @@ class RaceValidationTest(unittest.TestCase):
     def test_non_finisher_has_no_finish(self):
         self.assertRejected("did not finish", finish=4, outcome="fell")
 
+    def test_void_race_has_no_finish(self):
+        self.assertRejected("void race has no official result", finish=1, outcome="void")
+
     def test_unknown_race_field(self):
         self.assertRejected("Unknown race fields", position=1)
 
@@ -147,6 +155,24 @@ class RacesAndOtherFieldsTest(unittest.TestCase):
     def test_results_length_mismatch_rejected(self):
         with self.assertRaises(ValueError):
             horse(results=["W", "DH"], races=self.RACES)
+
+    def test_results_skip_void_races(self):
+        horse(results=["W", "DH", "L"], races=self.RACES[:1] + [{"outcome": "void"}] + self.RACES[1:])
+        with self.assertRaises(ValueError):
+            horse(results=["W", "L", "DH", "L"], races=self.RACES[:1] + [{"outcome": "void"}] + self.RACES[1:])
+
+    def test_void_races_are_not_counted_against_summary(self):
+        races = self.RACES + [{"outcome": "void"}]
+        horse(races=races, complete_fields=["races"], summary={"starts": 3, "wins": 2})
+
+    def test_void_race_abroad_is_not_racing_abroad(self):
+        h = horse(country="GB", international=False, races=[{"country": "GB", "finish": 1},
+                                                            {"country": "FR", "outcome": "void"}])
+        self.assertEqual(h.race_countries(), ["GB"])
+
+    def test_void_race_still_checked_for_date_order(self):
+        with self.assertRaises(ValueError):
+            horse(races=[{"date": "1875-06"}, {"date": "1875-01", "outcome": "void"}])
 
     def test_results_can_supply_an_unknown_race_result(self):
         horse(results=["W", "DH", "L", "W"], races=self.RACES + [{"race": "Result not recorded"}])

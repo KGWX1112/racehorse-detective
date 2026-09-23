@@ -28,11 +28,12 @@ RESULT_CODES = ("W", "DH", "L")
 WIN_CODES = ("W", "DH")
 
 # The official result decides the code: a horse demoted from first loses, and
-# a horse promoted to first wins. A walkover counts as a win and a start.
+# a horse promoted to first wins. A walkover counts as a win and a start. A void
+# race is not a start, so it has no code and counts nowhere a start would.
 NON_FINISH_OUTCOMES = (
     "fell", "pulled_up", "unseated", "refused", "brought_down", "ran_out", "did_not_finish",
 )
-OUTCOMES = ("finished", "dead_heat", "walkover", "disqualified", "promoted") + NON_FINISH_OUTCOMES
+OUTCOMES = ("finished", "dead_heat", "walkover", "disqualified", "promoted") + NON_FINISH_OUTCOMES + ("void",)
 
 LIST_FIELDS = (
     "nicknames", "trainers", "jockeys", "owners",
@@ -109,7 +110,9 @@ class Race:
 
     @property
     def result_code(self) -> Optional[str]:
-        """W, DH, or L from the official result, or None when the record does not say."""
+        """W, DH, or L from the official result. None for a void race or when the record does not say."""
+        if self.outcome == "void":
+            return None
         if self.outcome == "walkover":
             return "W"
         if self.outcome == "disqualified" or self.outcome in NON_FINISH_OUTCOMES:
@@ -123,6 +126,10 @@ class Race:
     @property
     def is_walkover(self) -> bool:
         return self.outcome == "walkover"
+
+    @property
+    def counts_as_start(self) -> bool:
+        return self.outcome != "void"
 
     @property
     def grade_key(self) -> Optional[str]:
@@ -162,6 +169,8 @@ class Race:
             out.append("a walkover must have finish 1 or no finish")
         if self.outcome in NON_FINISH_OUTCOMES and self.finish is not None:
             out.append(f"outcome '{self.outcome}' means the horse did not finish, so finish must be empty")
+        if self.outcome == "void" and self.finish is not None:
+            out.append("a void race has no official result, so finish must be empty")
         return out
 
     @classmethod
@@ -276,15 +285,16 @@ class Horse:
                 problems.append(f"{r.describe(i)} is dated before an earlier race; races must be in career order")
             latest_start = first if latest_start is None else max(latest_start, first)
 
-        codes = [r.result_code for r in self.races]
+        counted = [(i, r) for i, r in enumerate(self.races, start=1) if r.counts_as_start]
+        codes = [r.result_code for _, r in counted]
         if self.results is not None:
-            if len(self.results) != len(self.races):
-                problems.append(f"results has {len(self.results)} entries but races has {len(self.races)}")
+            if len(self.results) != len(counted):
+                problems.append(f"results has {len(self.results)} entries but races has {len(counted)} starts")
             else:
-                for i, (code, derived) in enumerate(zip(self.results, codes), start=1):
-                    if derived is not None and derived != code:
-                        problems.append(f"{self.races[i - 1].describe(i)}: results says {code} "
-                                        f"but the race record gives {derived}")
+                for code, (i, r) in zip(self.results, counted):
+                    if r.result_code is not None and r.result_code != code:
+                        problems.append(f"{r.describe(i)}: results says {code} "
+                                        f"but the race record gives {r.result_code}")
 
         s = self.summary
         complete = self.is_complete("races")
@@ -292,7 +302,7 @@ class Horse:
         known_wins = sum(c in WIN_CODES for c in codes)
         if s.starts is not None and (s.starts != n if complete else s.starts < n):
             listed = "the complete race list has" if complete else "the race list already has"
-            problems.append(f"summary.starts={s.starts} but {listed} {n} races")
+            problems.append(f"summary.starts={s.starts} but {listed} {n} starts")
         if s.wins is not None and (s.wins < known_wins or (complete and s.wins > known_wins + unknown)):
             extra = f" and {unknown} with unknown results" if unknown else ""
             problems.append(f"summary.wins={s.wins} but the race list shows {known_wins} wins{extra}")
@@ -320,18 +330,26 @@ class Horse:
                 return "; ".join(per_race)
         return self.sources.get("*")
 
-    def derived_results(self) -> Optional[List[str]]:
-        """W/DH/L codes from races, or None if races is unrecorded or any race's result is unknown."""
+    def starts_list(self) -> Optional[List[Race]]:
+        """The race records that count as starts, which leaves out void races."""
         if self.races is None:
             return None
-        codes = [r.result_code for r in self.races]
+        return [r for r in self.races if r.counts_as_start]
+
+    def derived_results(self) -> Optional[List[str]]:
+        """W/DH/L codes from races, or None if races is unrecorded or any start's result is unknown."""
+        starts = self.starts_list()
+        if starts is None:
+            return None
+        codes = [r.result_code for r in starts]
         return None if None in codes else codes
 
     def race_countries(self) -> Optional[List[str]]:
-        """Distinct countries in the race records, in order of first appearance."""
-        if self.races is None:
+        """Distinct countries of the starts, in order of first appearance."""
+        starts = self.starts_list()
+        if starts is None:
             return None
-        return list(dict.fromkeys(r.country for r in self.races if r.country))
+        return list(dict.fromkeys(r.country for r in starts if r.country))
 
     @property
     def label(self) -> str:

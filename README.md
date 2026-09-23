@@ -68,18 +68,18 @@ Ids are built from name, country suffix, and foaling year, e.g. `silver-comet-jp
 | `distance_text` | Distance as published, e.g. `"1m 2f"` |
 | `surface` | Racing surface |
 | `finish` | Official finishing position; 1 means won |
-| `outcome` | `finished`, `dead_heat`, `walkover`, `disqualified`, `promoted`, `fell`, `pulled_up`, `unseated`, `refused`, `brought_down`, `ran_out`, or `did_not_finish` |
+| `outcome` | `finished`, `dead_heat`, `walkover`, `disqualified`, `promoted`, `fell`, `pulled_up`, `unseated`, `refused`, `brought_down`, `ran_out`, `did_not_finish`, or `void` |
 | `field_size`, `jockey`, `trainer`, `notes`, `source` | As named |
 
-Each race gets a W, DH, or L code from its official result. A dead heat for first is `DH`. A walkover counts as a win and as a start. A horse disqualified from first counts as a loss, and a horse promoted to first counts as a win. Any outcome where the horse did not finish is a loss. A race with no finish and no deciding outcome has an unknown result.
+Each race gets a W, DH, or L code from its official result. A dead heat for first is `DH`. A walkover counts as a win and as a start. A horse disqualified from first counts as a loss, and a horse promoted to first counts as a win. Any outcome where the horse did not finish is a loss. A void race is not a start: it has no code, and it is left out of starts, wins, streaks, and the countries the horse raced in. It stays in the list so that dates are still checked. A race with no finish and no deciding outcome has an unknown result.
 
 Race records cannot be entered with `set`. Put them in a JSON file and use `import`. Mark the list complete with `set ID races --complete`.
 
-Validation rejects races whose dates go backwards. A partial date conflicts with another date only when their ranges cannot overlap, so `"1875"` may follow `"1875-06-12"`. When a horse has both `results` and `races`, the two must have the same length, and every known race result must match its code in `results`. A complete race list must match `summary.starts`, and a partial list cannot show more races or wins than the summary.
+Validation rejects races whose dates go backwards. A partial date conflicts with another date only when their ranges cannot overlap, so `"1875"` may follow `"1875-06-12"`. When a horse has both `results` and `races`, `results` must have one code per start (void races excluded), and every known race result must match its code in `results`. A complete race list must match `summary.starts`, and a partial list cannot show more races or wins than the summary.
 
 When `results` is absent, the streak, unbeaten, and career clues use the codes derived from `races`. Starts and wins are counted only from a complete race list. A race abroad shows that the horse raced internationally even when the race list is partial.
 
-Grades compare through a normalized form, so "G1", "Group 1", "Grade 1", and "Grade I" are equal. The published text is kept.
+Grades compare through a normalized form, so "G1", "Group 1", "Grade 1", "Grade I", and Japan's domestic "Jpn1" are equal. The published text is kept.
 
 ## How cases are scored
 
@@ -112,7 +112,7 @@ Text clues match whole words after lowercasing and stripping punctuation, so "Mo
 
 `cases/benchmarks.json` has twelve cases against the eight seed horses. The first nine come from V0.1. They cover the prototype case in soft and hard form (both end in a tie, because Crimson Monarch's longest streak is six), elimination by title and date, inference from a summary-only career, a sparse-data horse that stays unresolved, a no-match case, counts derived from a complete race list, international status derived from venues, and word-boundary matching. The other three cover race records: a career derived from a complete race list, racing abroad shown by a partial race list, and a streak that stays unknown on a partial race list.
 
-All eight seed horses are fictional. Old Tempest and Harbor Lantern were added to test horses with a career summary and no race order. Copper Wren has a complete race list that includes a walkover, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first. Juniper Vale has a career summary and a partial race list.
+All eight seed horses are fictional. Old Tempest and Harbor Lantern were added to test horses with a career summary and no race order. Copper Wren has a complete race list that includes a walkover, a void race, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first. Juniper Vale has a career summary and a partial race list.
 
 Run the benchmark after every change. Add a case each time you find a behavior you want to keep.
 
@@ -130,7 +130,7 @@ Race records store dates, venues, grades, and distances, but no clue type reads 
 
 If any race in a list has an unknown result, the derived code sequence as a whole is unknown. Streak clues then return unknown for that horse, even when the known races would settle them.
 
-Grade matching knows the G, Group, Grade, and Listed forms. Other published grades, such as Japan's Jpn1, compare as plain text.
+Grade matching knows the G, Group, Grade, Jpn, and Listed forms. Other published grades compare as plain text.
 
 Title matching has no aliases, so a race that was renamed or sponsored under different names needs each name entered. Synonyms are V0.3.
 

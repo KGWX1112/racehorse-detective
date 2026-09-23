@@ -74,6 +74,7 @@
         {"date": "1986-07-02", "race": "Fellbrook Stakes", "venue": "Fellbrook", "country": "GB", "distance_text": "6f", "finish": 1, "field_size": 8},
         {"date": "1986-08", "race": "Harrowgate Plate", "venue": "Harrowgate", "country": "GB", "finish": 1, "field_size": 1, "outcome": "walkover"},
         {"date": "1987-04-18", "race": "Marsh Lane Stakes", "venue": "Ashcombe", "country": "GB", "grade": "Listed", "distance_m": 1600, "finish": 1, "field_size": 7},
+        {"date": "1987-05-02", "race": "Greywell Stakes", "venue": "Fellbrook", "country": "GB", "grade": "Listed", "field_size": 8, "outcome": "void", "notes": "Race declared void."},
         {"date": "1987-05-23", "race": "Coldharbour Cup", "venue": "Fellbrook", "country": "GB", "grade": "Group 3", "finish": 1, "field_size": 9, "outcome": "dead_heat", "notes": "Dead heat for first."},
         {"date": "1987-06-20", "race": "Pennock Stakes", "venue": "Harrowgate", "country": "GB", "grade": "G2", "finish": 1, "field_size": 6},
         {"date": "1987-07-25", "race": "Valewood Cup", "venue": "Ashcombe", "country": "GB", "grade": "Group 1", "finish": 2, "field_size": 10, "outcome": "disqualified", "notes": "Passed the post first; placed second by the stewards."},
@@ -82,7 +83,7 @@
         {"date": "1988-04-30", "race": "Tallis Stakes", "venue": "Harrowgate", "country": "GB", "grade": "G3", "finish": 1, "field_size": 7, "outcome": "promoted", "notes": "Finished second; promoted to first after the winner was disqualified."}
       ],
       "complete_fields": ["races"],
-      "notes": "Fictional. Complete race records with a walkover, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first.",
+      "notes": "Fictional. Complete race records with a walkover, a void race, a dead heat for first, a disqualification from first, a pulled-up run, and a promotion to first.",
       "sources": {"*": "V0.2 test data (fictional)"}
     },
     {

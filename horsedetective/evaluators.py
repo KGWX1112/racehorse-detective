@@ -116,9 +116,9 @@ def result_sequence(h: Horse) -> Tuple[Optional[List[str]], bool, List[str]]:
     """
     The W/DH/L sequence, whether it covers the whole career, and the fields it
     came from. An explicit results list comes first; otherwise the codes are
-    derived from races, which needs every race's result to be known. Validation
-    keeps results and races the same length when both exist, so either one
-    marked complete makes the sequence complete.
+    derived from the starts in races, which needs every start's result to be
+    known. Validation keeps results and the starts the same length when both
+    exist, so either one marked complete makes the sequence complete.
     """
     used = [f for f in ("results", "races") if getattr(h, f) is not None]
     complete = any(h.is_complete(f) for f in used)
@@ -143,7 +143,7 @@ def known_counts(h: Horse) -> Tuple[Optional[int], Optional[int], List[str]]:
     seq, complete, seq_fields = result_sequence(h)
     if complete:
         if starts is None:
-            starts = len(seq) if seq is not None else len(h.races)
+            starts = len(seq) if seq is not None else len(h.starts_list())
         if wins is None and seq is not None:
             wins = sum(r in WIN_CODES for r in seq)
         used.extend(seq_fields)
@@ -165,7 +165,7 @@ def known_raced_countries(h: Horse) -> Tuple[Optional[List[str]], bool, List[str
     if listed is not None:
         complete = h.is_complete("raced_countries")
     else:
-        complete = h.is_complete("races") and all(r.country for r in h.races)
+        complete = h.is_complete("races") and all(r.country for r in h.starts_list())
     return countries, complete, used
 
 

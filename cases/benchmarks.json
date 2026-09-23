@@ -86,7 +86,7 @@
     },
     {
       "name": "race-records-derived-career",
-      "notes": "Copper Wren has only race records. Its five-race streak counts a walkover and a dead heat for first as wins, and ends when it is disqualified from first. Starts, wins, and racing abroad come from the complete race list.",
+      "notes": "Copper Wren has only race records. Its five-race streak counts a walkover and a dead heat for first as wins, passes over a void race that is not a start, and ends when it is disqualified from first. Starts, wins, and racing abroad come from the complete race list.",
       "clues": [
         {"description": "Won five in a row", "type": "win_streak", "params": {"min": 5}, "hard": true},
         {"description": "Lost directly after the five-race streak", "type": "loss_after_streak", "params": {"min": 5}, "hard": true},
