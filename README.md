@@ -88,6 +88,10 @@ All six seed horses are fictional. Old Tempest and Harbor Lantern were added to 
 
 Run the benchmark after every change. Add a case each time you find a behavior you want to keep.
 
+## Unit tests
+
+`tests/` holds `unittest` tests for the career and text helpers, the `international` evaluator, and command-line behavior that the benchmark cannot check. Run them from the repository root with `python -m unittest`. They need no network access.
+
 ## Adding a clue type
 
 Write a function in `horsedetective/evaluators.py` that takes a horse and the clue's params and returns a `Finding` with a status, an explanation, and the fields it relied on. Register it with `@evaluator("name", required=(...))`.
@@ -100,4 +104,4 @@ Title matching has no aliases, so a race that was renamed or sponsored under dif
 
 Weights are set by hand. The score ranks candidates within one case and is not a probability.
 
-If you replace the results list of a horse whose results are marked complete, the complete mark stays. Add `--incomplete` when the new list is partial.
+If you replace a field that is marked complete, such as `results`, `set` keeps the complete mark and prints a warning. Add `--incomplete` when the new value is partial.
