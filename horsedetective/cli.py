@@ -14,9 +14,10 @@ Command-line interface.
 
 import argparse
 import json
+import os
 import re
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .engine import Case, investigate
 from .evaluators import EVALUATORS
@@ -214,6 +215,10 @@ def cmd_set(store: HorseStore, args) -> None:
     updated = Horse.from_dict(d)  # re-validates; the id stays fixed even if name/country/foaled change
     store.upsert(updated)
     print(f"Updated {updated.label}: {field}.")
+    replaced = getattr(updated, field, None) != getattr(horse, field, None)
+    if replaced and updated.is_complete(field) and not args.complete:
+        print(f"Warning: '{field}' is still marked complete. If the new value is not the full record, "
+              f"remove the mark with --incomplete.", file=sys.stderr)
     if field in ("name", "country", "foaled"):
         new_id = make_horse_id(updated.name, updated.country, updated.foaled)
         if new_id != updated.id:
@@ -267,7 +272,7 @@ def cmd_bench(store: HorseStore, args) -> None:
         sys.exit(1)
 
 
-def cmd_clues(store: HorseStore, args) -> None:
+def cmd_clues(store: Optional[HorseStore], args) -> None:
     for name, spec in sorted(EVALUATORS.items()):
         params = list(spec.required) + ([f"one of {list(spec.any_of)}"] if spec.any_of else [])
         print(f"{name}")
@@ -331,17 +336,33 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_bench)
 
     s = sub.add_parser("clues", help="List supported clue types")
-    s.set_defaults(func=cmd_clues)
+    s.set_defaults(func=cmd_clues, uses_db=False)
     return p
+
+
+def _run(args) -> None:
+    try:
+        if getattr(args, "uses_db", True):
+            with HorseStore(args.db) as store:
+                args.func(store, args)
+        else:
+            args.func(None, args)
+    except ValueError as e:
+        raise SystemExit(f"Error: {e}")
 
 
 def main(argv=None) -> None:
     args = build_parser().parse_args(argv)
     try:
-        with HorseStore(args.db) as store:
-            args.func(store, args)
-    except ValueError as e:
-        raise SystemExit(f"Error: {e}")
+        try:
+            _run(args)
+        finally:
+            sys.stdout.flush()
+    except BrokenPipeError:
+        # The reader closed the pipe early, as `| head` does. Point stdout at
+        # devnull so the flush at interpreter exit cannot raise a second time.
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(1)
 
 
 if __name__ == "__main__":

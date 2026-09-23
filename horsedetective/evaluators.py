@@ -235,6 +235,10 @@ def eval_international(h: Horse, p: Dict[str, Any]) -> Finding:
     if raced_abroad is None:
         if used:
             return Finding(U, f"Recorded races are all in {h.country}, but the list is not marked complete.", used)
+        if h.raced_countries is not None:
+            listed = ", ".join(h.raced_countries) or "none listed"
+            return Finding(U, f"Country of foaling is unknown, so the raced countries ({listed}) "
+                              f"cannot be compared with it.", ["raced_countries"])
         return Finding(U, "No record of where the horse raced.", used)
     return Finding(M if raced_abroad == want else X, detail, used)
 
